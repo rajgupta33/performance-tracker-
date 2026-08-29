@@ -39,4 +39,10 @@ describe('AttendanceActions', () => {
     expect(screen.queryByLabelText('Attendance duty type')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /check out/i })).toBeInTheDocument();
   });
+
+  it('labels a safely queued offline punch without implying server verification', () => {
+    render(<AttendanceActions {...baseProps} status="queued" isDisabled />);
+
+    expect(screen.getByRole('button', { name: /saved for sync/i })).toBeDisabled();
+  });
 });

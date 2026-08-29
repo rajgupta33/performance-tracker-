@@ -14,7 +14,8 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [hasPendingCheckIn, setHasPendingCheckIn] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'queued'>('idle');
 
   // Clock Timer
   useEffect(() => {
@@ -32,8 +33,9 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
 
       // Drain the core check-in sync queue (offline/5xx check-ins that
       // never created a record). See Others/CHECKIN_SYNC_QUEUE_RECORD.md.
-      // Fire-and-forget — failures are reclassified + rescheduled inside.
-      hrService.drainCheckInQueue?.().catch(() => { /* handled inside */ });
+      // Await before querying the active row so a successful replay cannot
+      // race the UI into offering a second check-in.
+      await hrService.drainCheckInQueue?.().catch(() => { /* handled inside */ });
 
       const [reconciled, config, shift] = await Promise.all([
         hrService.getActiveAttendanceWithReconciliation(user.id),
@@ -43,6 +45,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
 
       const { active, closedPast } = reconciled;
       const today = getAttendanceClock(new Date(), config.timezone || 'UTC').date;
+      setHasPendingCheckIn(hrService.hasPendingCheckIn(user.id, today));
 
       if (active && active.date !== today) {
         setActiveRecord(undefined);
@@ -88,7 +91,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   const submitPunch = async (
     dutyType: 'OFFICE' | 'FACTORY',
     remarks: string,
-    location: { lat: number; lng: number; address: string },
+    location: { lat: number; lng: number; address: string; accuracyM: number; capturedAt: string },
     selfieData: string
   ) => {
     setStatus('loading');
@@ -122,7 +125,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
           }
         }
         
-        await hrService.saveAttendance({
+        const result = await hrService.saveAttendance({
           id: '', 
           employeeId: user.id, 
           employeeName: user.name, 
@@ -134,6 +137,15 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
           remarks: dutyType === 'FACTORY' ? `[FACTORY] ${remarks}` : remarks,
           dutyType: dutyType
         });
+        if (result?.queued) {
+          setHasPendingCheckIn(true);
+          setStatus('queued');
+          showToast('Check-in saved offline. It will sync automatically; do not punch again.', 'info');
+          setTimeout(() => {
+            if (onFinish) onFinish();
+          }, 1800);
+          return;
+        }
       }
       
       setStatus('success');
@@ -164,6 +176,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
     isLoading,
     isRefreshing,
     loadError,
+    hasPendingCheckIn,
     status,
     submitPunch,
     retryLoad: refreshData,

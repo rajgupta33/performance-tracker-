@@ -176,7 +176,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
     setIsProcessing(true);
     try {
       const emp = employees.find(e => e.id === absentForm.employeeId);
-      await hrService.saveAttendance({
+      await hrService.saveManualAttendance({
         id: '',
         employeeId: absentForm.employeeId,
         employeeName: emp?.name,
@@ -656,6 +656,11 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                    <div className="flex-1 pr-4">
                       <p className="text-xs font-bold text-slate-700">{selectedLog.location?.address}</p>
                       <p className="text-[9px] font-mono text-slate-400 mt-1">{selectedLog.location?.lat.toFixed(6)}, {selectedLog.location?.lng.toFixed(6)}</p>
+                      <p className={`text-[9px] font-semibold mt-1 ${selectedLog.location?.accuracyM == null ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {selectedLog.location?.accuracyM == null
+                          ? 'Legacy capture · GPS accuracy unavailable'
+                          : `Accuracy ±${Math.round(selectedLog.location.accuracyM)} m${selectedLog.location.capturedAt ? ` · Captured ${new Date(selectedLog.location.capturedAt).toLocaleString()}` : ''}`}
+                      </p>
                    </div>
                    <a href={`https://www.google.com/maps?q=${selectedLog.location?.lat},${selectedLog.location?.lng}`} target="_blank" rel="noreferrer" className="p-3 bg-white text-primary rounded-xl shadow-sm border border-slate-50 hover:bg-primary hover:text-white transition-all"><ExternalLink size={18} /></a>
                 </div>

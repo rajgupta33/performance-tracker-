@@ -37,12 +37,14 @@ export const hrService = {
   getActiveAttendance: attendanceService.getActiveAttendance,
   getActiveAttendanceWithReconciliation: attendanceService.getActiveAttendanceWithReconciliation,
   saveAttendance: attendanceService.saveAttendance,
+  saveManualAttendance: attendanceService.saveManualAttendance,
   updateAttendance: attendanceService.updateAttendance,
   deleteAttendance: attendanceService.deleteAttendance,
   getAttendanceAuditEvents: attendanceService.getAttendanceAuditEvents,
   reviewAttendanceException: attendanceService.reviewAttendanceException,
   retryPendingSelfies: attendanceService.retryPendingSelfies,
   drainCheckInQueue: attendanceService.drainCheckInQueue,
+  hasPendingCheckIn: attendanceService.hasPendingCheckIn,
 
   // Leaves (Delegate to leaveService)
   getLeaves: leaveService.getLeaves,

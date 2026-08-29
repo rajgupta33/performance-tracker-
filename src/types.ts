@@ -144,13 +144,14 @@ export interface Employee extends User {
 
 export interface Attendance {
   id: string;
+  clientEventId?: string;
   employeeId: string;
   employeeName?: string;
   date: string;
   checkIn?: string;
   checkOut?: string;
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | 'EARLY_OUT' | 'HALF_DAY' | 'HOLIDAY' | 'REMOTE';
-  location?: { lat: number; lng: number; address?: string };
+  location?: { lat: number; lng: number; address?: string; accuracyM?: number; capturedAt?: string };
   remarks?: string;
   selfie?: string;
   dutyType?: 'OFFICE' | 'FACTORY';
@@ -316,6 +317,7 @@ export interface AppConfig {
   officeLocations?: OfficeLocation[];
   dutyLabel1?: string; // Display label for OFFICE duty type (default "Office")
   dutyLabel2?: string; // Display label for FACTORY duty type (default "Factory")
+  attendanceMaxGpsAccuracyM?: number; // Maximum accepted attendance GPS uncertainty in metres
 }
 
 export interface RegistrationData {

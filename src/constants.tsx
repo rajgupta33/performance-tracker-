@@ -213,5 +213,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   earlyOutGracePeriod: 15,
   defaultReportRecipient: "",
   dutyLabel1: "Office",
-  dutyLabel2: "Factory"
+  dutyLabel2: "Factory",
+  attendanceMaxGpsAccuracyM: 250,
 };

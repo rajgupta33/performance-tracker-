@@ -40,7 +40,13 @@ const getLocationErrorMessage = (err: any): string => {
 };
 
 export const useGeoLocation = () => {
-  const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [location, setLocation] = useState<{
+    lat: number;
+    lng: number;
+    address: string;
+    accuracyM: number;
+    capturedAt: string;
+  } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [geoFences, setGeoFences] = useState<OfficeLocation[]>(OFFICE_LOCATIONS);
@@ -146,7 +152,13 @@ export const useGeoLocation = () => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const address = await resolveAddress(lat, lng, geoFences);
-      setLocation({ lat, lng, address });
+      setLocation({
+        lat,
+        lng,
+        address,
+        accuracyM: Math.max(0, pos.coords.accuracy),
+        capturedAt: new Date(pos.timestamp || Date.now()).toISOString(),
+      });
     } catch (err: any) {
       console.error('Geolocation detection failed:', err);
       setError(getLocationErrorMessage(err));
@@ -167,7 +179,13 @@ export const useGeoLocation = () => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         resolveAddress(lat, lng, geoFences).then(address => {
-          setLocation({ lat, lng, address });
+          setLocation({
+            lat,
+            lng,
+            address,
+            accuracyM: Math.max(0, pos.coords.accuracy),
+            capturedAt: new Date(pos.timestamp || Date.now()).toISOString(),
+          });
         });
       },
       () => setError('Location watch error.'),

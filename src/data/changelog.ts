@@ -18,6 +18,9 @@ export const changelog: ChangelogRelease[] = [
     date: '2026-08-30',
     title: 'Attendance punching is safer at midnight and during sync failures',
     entries: [
+      { type: 'security', description: 'Employee check-ins now go through a tenant-scoped database function that verifies the authenticated employee, organization-local work date, GPS coordinates, accuracy, and capture freshness. Organizations can configure the accepted GPS uncertainty; the default remains 250 metres.' },
+      { type: 'fix', description: 'Every new check-in carries a stable client event ID through the offline queue and database. Replaying an event after a lost network response returns the original attendance row instead of creating a duplicate.' },
+      { type: 'improvement', description: 'Offline check-ins are now labelled “Saved for Sync” and block another punch while pending. Legacy queued entries remain recoverable but are routed to manager review when they lack the new GPS-accuracy evidence.' },
       { type: 'fix', description: 'Attendance now derives the work date and late-check wall clock from the organization timezone while storing the exact captured instant. This prevents punches around UTC midnight from being assigned to the previous or next workday.' },
       { type: 'fix', description: 'The punch action stays disabled when the current attendance session cannot be synchronized, with a visible retry action. If a punch was saved but the follow-up refresh fails, the app now says it was saved instead of reporting a false failure that could prompt a duplicate punch.' },
       { type: 'improvement', description: 'Employees opening the main attendance screen can choose Office or Field / Factory before checking in; an active session keeps its original duty type.' },

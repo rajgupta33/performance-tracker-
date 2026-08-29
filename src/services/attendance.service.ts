@@ -9,6 +9,7 @@ import { ReconcileResult } from './workday/workdaySessionManager.types';
 import { convertToWebP } from '../utils/imageConvert';
 import { checkInSyncQueue, classifySyncError } from './attendance/syncQueue';
 import { CheckInSyncEntry } from './attendance/syncQueue.types';
+import { buildAttendanceCheckInParams, ensureAttendanceEventId } from './attendance/checkInPayload';
 
 const SELFIE_WEBP_QUALITY = 0.65;
 const SELFIE_MAX_DIMENSION = 720;
@@ -146,7 +147,11 @@ function hhmmToISO(hhmm: string | undefined, dateYMD?: string): string | null {
   return isNaN(iso.getTime()) ? null : iso.toISOString();
 }
 
-const buildAttendancePayload = (data: Attendance, orgId: string | undefined): any => ({
+const buildAttendancePayload = (
+  data: Attendance,
+  orgId: string | undefined,
+  legacyReview = false,
+): any => ({
   employee_id: data.employeeId.trim(),
   employee_name: data.employeeName,
   date: data.date,
@@ -158,7 +163,22 @@ const buildAttendancePayload = (data: Attendance, orgId: string | undefined): an
   longitude: parseFloat(String(data.location?.lng || 0)),
   duty_type: data.dutyType,
   organization_id: orgId,
+  ...(legacyReview ? {
+    requires_review: true,
+    review_status: 'PENDING',
+    change_reason: 'LEGACY_OFFLINE_CHECKIN_NO_GPS',
+  } : {}),
 });
+
+const submitVerifiedCheckIn = async (data: Attendance): Promise<string> => {
+  const { data: created, error } = await supabase.rpc(
+    'submit_attendance_check_in',
+    buildAttendanceCheckInParams(data),
+  );
+  if (error) throw error;
+  if (!created?.id) throw new Error('Attendance check-in did not return a record');
+  return created.id;
+};
 
 // Supabase stores check_in/check_out as timestamptz (full ISO string).
 // The rest of the app expects HH:mm. Convert only when the value looks like
@@ -173,6 +193,7 @@ function isoToHHMM(val: string | null | undefined): string {
 
 const mapAttendance = (r: any): Attendance => ({
   id: r.id,
+  clientEventId: r.client_event_id || undefined,
   employeeId: r.employee_id ? r.employee_id.toString().trim() : '',
   employeeName: r.employee_name,
   date: r.date,
@@ -183,6 +204,8 @@ const mapAttendance = (r: any): Attendance => ({
     lat: Number(r.latitude) || 0,
     lng: Number(r.longitude) || 0,
     address: r.location || 'Unknown',
+    accuracyM: r.location_accuracy_m == null ? undefined : Number(r.location_accuracy_m),
+    capturedAt: r.location_captured_at || undefined,
   },
   // selfie stores the storage path; signed URLs resolved after fetch (private bucket)
   selfie: r.selfie || undefined,
@@ -320,46 +343,62 @@ export const attendanceService = {
 
   async saveAttendance(data: Attendance) {
     if (!isSupabaseConfigured()) return;
-    const orgId = apiClient.getOrganizationId();
-
-    const payload = buildAttendancePayload(data, orgId ?? undefined);
+    const attendanceWithEventId = ensureAttendanceEventId(data);
     let createdId: string;
     try {
-      const { data: created, error } = await supabase
-        .from('attendance')
-        .insert(payload)
-        .select('id')
-        .single();
-      if (error) throw error;
-      createdId = created.id;
+      createdId = await submitVerifiedCheckIn(attendanceWithEventId);
     } catch (err: any) {
       const syncErr = classifySyncError(err);
-      try {
-        checkInSyncQueue.enqueue({
-          kind: 'CHECK_IN',
-          payload: data,
-          occurredAt: Date.now(),
-        });
-        console.warn('[AttendanceService] Check-in enqueued for later sync:', syncErr.code);
-      } catch (enqueueErr) {
-        console.error('[AttendanceService] Could not enqueue check-in:', enqueueErr);
+      if (syncErr.retryable) {
+        try {
+          checkInSyncQueue.enqueue({
+            kind: 'CHECK_IN',
+            payload: attendanceWithEventId,
+            occurredAt: Date.now(),
+          });
+          console.warn('[AttendanceService] Check-in enqueued for later sync:', syncErr.code);
+          return { queued: true as const };
+        } catch (enqueueErr) {
+          console.error('[AttendanceService] Could not enqueue check-in:', enqueueErr);
+        }
       }
       throw err;
     }
     attendanceService.clearCache();
     apiClient.notify();
 
-    if (data.selfie) {
-      uploadSelfieWithRetry(createdId, data.selfie).catch((err) => {
+    if (attendanceWithEventId.selfie) {
+      uploadSelfieWithRetry(createdId, attendanceWithEventId.selfie).catch((err) => {
         console.warn('[AttendanceService] Selfie upload failed after retries, queued:', err?.message || err);
       });
     }
 
-    if (data.status === 'LATE') {
-      notifyLineManagerOfLate(data).catch((e: any) => {
+    if (attendanceWithEventId.status === 'LATE') {
+      notifyLineManagerOfLate(attendanceWithEventId).catch((e: any) => {
         console.error('[AttendanceService] Failed to send late alert:', e?.message || e);
       });
     }
+    return { queued: false as const };
+  },
+
+  hasPendingCheckIn(employeeId: string, date: string): boolean {
+    return checkInSyncQueue.list().some((entry) =>
+      entry.kind === 'CHECK_IN'
+      && entry.status !== 'DEAD_LETTER'
+      && entry.payload.employeeId === employeeId
+      && entry.payload.date === date,
+    );
+  },
+
+  async saveManualAttendance(data: Attendance): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const orgId = apiClient.getOrganizationId();
+    const { error } = await supabase
+      .from('attendance')
+      .insert(buildAttendancePayload(data, orgId ?? undefined));
+    if (error) throw error;
+    attendanceService.clearCache();
+    apiClient.notify();
   },
 
   async drainCheckInQueue(): Promise<void> {
@@ -373,19 +412,38 @@ export const attendanceService = {
       if (!entry) break;
 
       try {
-        const effectiveOrgId = entry.payload.organizationId || orgId;
-        const pbPayload = buildAttendancePayload(entry.payload as Attendance, effectiveOrgId ?? undefined);
-        const { data: created, error } = await supabase
-          .from('attendance')
-          .insert(pbPayload)
-          .select('id')
-          .single();
-        if (error) throw error;
+        let createdId: string;
+        if (entry.payload.clientEventId && entry.payload.location?.capturedAt && entry.payload.location.accuracyM != null) {
+          createdId = await submitVerifiedCheckIn(entry.payload as Attendance);
+        } else {
+          // Backward compatibility for entries queued before migration 0042.
+          const effectiveOrgId = entry.payload.organizationId || orgId;
+          const legacyPayload = buildAttendancePayload(entry.payload as Attendance, effectiveOrgId ?? undefined, true);
+          const { data: existing, error: existingError } = await supabase
+            .from('attendance')
+            .select('id')
+            .eq('employee_id', legacyPayload.employee_id)
+            .eq('date', legacyPayload.date)
+            .eq('check_in', legacyPayload.check_in)
+            .maybeSingle();
+          if (existingError) throw existingError;
+          if (existing?.id) {
+            createdId = existing.id;
+          } else {
+            const { data: created, error } = await supabase
+              .from('attendance')
+              .insert(legacyPayload)
+              .select('id')
+              .single();
+            if (error) throw error;
+            createdId = created.id;
+          }
+        }
         checkInSyncQueue.markSuccess(entry.id);
         drained += 1;
 
         if (entry.payload.selfie) {
-          uploadSelfieWithRetry(created.id, entry.payload.selfie).catch((e) => {
+          uploadSelfieWithRetry(createdId, entry.payload.selfie).catch((e) => {
             console.warn('[AttendanceService] Queued selfie upload failed:', e?.message || e);
           });
         }

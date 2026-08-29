@@ -265,6 +265,20 @@ export const classifySyncError = (err: any): SyncError => {
   const message: string =
     err?.response?.message || err?.data?.message || err?.message || 'Unknown error';
 
+  const providerCode: string | undefined = err?.code || err?.response?.code || err?.data?.code;
+  if (status === null && providerCode) {
+    const retryable =
+      providerCode.startsWith('08') ||
+      providerCode === '40001' ||
+      providerCode === '40P01' ||
+      providerCode === 'PGRST000' ||
+      providerCode === 'PGRST001' ||
+      providerCode === 'PGRST002' ||
+      providerCode === 'PGRST003' ||
+      providerCode === 'PGRST202';
+    return { status: null, code: providerCode, message, retryable };
+  }
+
   // Network-level failure → no status. Retryable.
   if (status === null || status === 0) {
     return { status: null, code: 'NETWORK', message, retryable: true };

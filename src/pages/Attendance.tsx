@@ -14,6 +14,7 @@ import { AttendanceHeader } from '../components/attendance/AttendanceHeader';
 import { CameraFeed } from '../components/attendance/CameraFeed';
 import { LocationDisplay } from '../components/attendance/LocationDisplay';
 import { AttendanceActions } from '../components/attendance/AttendanceActions';
+import { isAttendanceLocationFresh } from '../utils/attendanceLocation';
 
 interface AttendanceProps {
   user: any;
@@ -26,7 +27,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
 
   // 1. Logic Hooks
   const {
-    currentTime, activeRecord, appConfig, isLoading, isRefreshing, loadError, status, submitPunch, retryLoad
+    currentTime, activeRecord, appConfig, isLoading, isRefreshing, loadError, hasPendingCheckIn, status, submitPunch, retryLoad
   } = useAttendance(user, onFinish);
 
   const {
@@ -117,6 +118,12 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
   };
 
   const hasPhoto = !!stream || !!fallbackPhoto;
+  const maxGpsAccuracyM = appConfig?.attendanceMaxGpsAccuracyM ?? 250;
+  const hasAccurateLocation = !!location && location.accuracyM <= maxGpsAccuracyM;
+  const hasFreshLocation = isAttendanceLocationFresh(location, currentTime);
+  const staleLocationError = location && !hasFreshLocation
+    ? 'Location is more than 5 minutes old. Retry GPS before punching.'
+    : null;
 
   if (isLoading) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
 
@@ -146,8 +153,9 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
           <LocationDisplay
             location={location}
             isLocating={isLocating}
-            error={locationError}
+            error={locationError || staleLocationError}
             onRetry={() => detectLocation(true)}
+            maxAccuracyM={maxGpsAccuracyM}
           />
         </CameraFeed>
       </div>
@@ -179,6 +187,13 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
         </div>
       )}
 
+      {hasPendingCheckIn && (
+        <div className="px-4 py-3 bg-blue-50 border-t border-blue-200 flex items-center gap-3 text-blue-800">
+          <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+          <span className="text-xs font-medium">A check-in is waiting to sync. Do not punch again; reconnect and reopen attendance.</span>
+        </div>
+      )}
+
       <AttendanceActions
         dutyType={dutyType}
         dutyLabel={dutyType === 'FACTORY' ? (appConfig?.dutyLabel2 || 'Factory') : (appConfig?.dutyLabel1 || 'Office')}
@@ -188,7 +203,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
         onSubmit={handlePunchSubmit}
         status={status}
         activeRecord={activeRecord}
-        isDisabled={!canPunch || isRefreshing || !!loadError || !location || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
+        isDisabled={!canPunch || hasPendingCheckIn || isRefreshing || !!loadError || !hasAccurateLocation || !hasFreshLocation || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
       />
 
       <canvas ref={canvasRef} className="hidden" />

@@ -10,7 +10,7 @@ interface Props {
   setRemarks: (val: string) => void;
   onDutyTypeChange: (value: 'OFFICE' | 'FACTORY') => void;
   onSubmit: () => void;
-  status: 'idle' | 'loading' | 'success';
+  status: 'idle' | 'loading' | 'success' | 'queued';
   isDisabled: boolean;
   activeRecord?: Attendance;
 }
@@ -61,6 +61,8 @@ export const AttendanceActions: React.FC<Props> = ({
         >
           {status === 'loading' ? (
             <RefreshCw className="animate-spin" size={18}/> 
+          ) : status === 'queued' ? (
+            'Saved for Sync'
           ) : (
             <>
               <Fingerprint size={18} /> 

@@ -271,7 +271,7 @@ export const OrgSystem: React.FC<Props> = ({ config, onSave }) => {
          </div>
 
          <div className="pt-8 border-t border-slate-50">
-             <div className="grid grid-cols-1 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div className="space-y-4 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
                    <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2"><Moon size={16} className="text-indigo-500"/> Auto-Absent Automation</h4>
                    <div className="flex items-center justify-between">
@@ -282,6 +282,22 @@ export const OrgSystem: React.FC<Props> = ({ config, onSave }) => {
                       <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">Cutoff Time (End of Day)</label>
                       <input type="time" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" value={config.autoAbsentTime || '23:55'} onChange={e => handleChange('autoAbsentTime', e.target.value)} />
                       <p className="text-[9px] text-slate-400 mt-1">If no punch found by this time, mark as ABSENT.</p>
+                   </div>
+               </div>
+               <div className="space-y-4 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+                   <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2"><MapPin size={16} className="text-emerald-600"/> Attendance GPS Quality</h4>
+                   <div className="space-y-1">
+                      <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">Maximum uncertainty (metres)</label>
+                      <input
+                        type="number"
+                        min="20"
+                        max="1000"
+                        step="10"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
+                        value={config.attendanceMaxGpsAccuracyM ?? 250}
+                        onChange={e => handleChange('attendanceMaxGpsAccuracyM', Math.min(1000, Math.max(20, Number(e.target.value) || 250)))}
+                      />
+                      <p className="text-[9px] text-slate-400 mt-1">Punching is blocked until the device reports this accuracy or better. Recommended: 250 m for field teams, 50 m for office teams.</p>
                    </div>
                </div>
              </div>

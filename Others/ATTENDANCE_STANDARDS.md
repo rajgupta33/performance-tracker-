@@ -36,8 +36,15 @@ The Supabase implementation now includes:
 - A manager audit filter for pending and auto-closed sessions.
 - Approve/correct actions with a required review note; manual administrator
   corrections also require a reason.
+- Idempotent employee check-in keys, so a retry after a lost response returns
+  the original attendance row instead of creating a duplicate.
+- GPS accuracy and capture-time evidence, enforced by the server against the
+  organization's configurable attendance threshold (250 metres by default).
+- Organization-timezone validation of the submitted work date and a five-minute
+  freshness window for the GPS fix.
 
-These changes are defined by migration `0041_attendance_audit_reviews.sql`.
+These changes are defined by migrations `0041_attendance_audit_reviews.sql`
+and `0042_attendance_verified_checkin.sql`.
 They do not feed attendance into performance scoring. The employee-initiated
 missed-punch request form and payroll lock remain future work.
 

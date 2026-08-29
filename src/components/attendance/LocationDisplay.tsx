@@ -4,10 +4,11 @@ import { createPortal } from 'react-dom';
 import { MapPin, RefreshCw, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
-  location: { lat: number; lng: number; address: string } | null;
+  location: { lat: number; lng: number; address: string; accuracyM: number } | null;
   isLocating: boolean;
   error?: string | null;
   onRetry: () => void;
+  maxAccuracyM?: number;
 }
 
 /** Step-by-step guides for enabling location on different platforms */
@@ -66,17 +67,20 @@ const LocationHelpGuide: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   </div>
 );
 
-export const LocationDisplay: React.FC<Props> = ({ location, isLocating, error, onRetry }) => {
+export const LocationDisplay: React.FC<Props> = ({ location, isLocating, error, onRetry, maxAccuracyM = 250 }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showError, setShowError] = useState(true);
 
   // Successful state — compact pill on the camera overlay
   if (location && !error) {
+    const accurateEnough = location.accuracyM <= maxAccuracyM;
     return (
-      <div className="mt-3 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl flex items-center gap-1.5 pointer-events-auto cursor-pointer" onClick={onRetry}>
-        <MapPin size={10} className="text-rose-400" />
-        <span className="text-[8px] font-semibold text-white uppercase tracking-wider">
-          {location.address}
+      <div className={`mt-3 px-3 py-2 backdrop-blur-md rounded-xl flex items-start gap-1.5 pointer-events-auto cursor-pointer ${accurateEnough ? 'bg-black/60' : 'bg-amber-600/90'}`} onClick={onRetry}>
+        {accurateEnough ? <MapPin size={10} className="mt-0.5 text-rose-400" /> : <AlertTriangle size={10} className="mt-0.5 text-white" />}
+        <span className="text-[8px] font-semibold text-white uppercase tracking-wider leading-tight">
+          {accurateEnough
+            ? `${location.address} · ±${Math.round(location.accuracyM)} m`
+            : `GPS accuracy ±${Math.round(location.accuracyM)} m. Need ±${maxAccuracyM} m or better — tap to retry.`}
         </span>
       </div>
     );
