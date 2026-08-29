@@ -15,6 +15,7 @@
 // Called by pg_cron via net.http_post() with Authorization: Bearer <CRON_SECRET>.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { zonedDateTimeToUtcIso } from '../_shared/timezone.ts';
 
 const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
 
@@ -147,19 +148,30 @@ Deno.serve(async (req: Request) => {
 
     let shouldClose = false;
     let closeRemark = '';
+    let reasonCode = '';
 
     if (isPastDate) {
       shouldClose = true;
       closeRemark = ' [System: Auto-Closed Past Date]';
+      reasonCode = 'AUTO_CLOSE_PAST_DATE';
     } else if (isToday && orgLocalTime >= autoCloseTime) {
       shouldClose = true;
       closeRemark = ' [System: Max Time Reached]';
+      reasonCode = 'AUTO_CLOSE_MAX_TIME_REACHED';
     }
 
     if (!shouldClose) continue;
 
     const existingRemarks = session.remarks || '';
-    const checkOutTs = (() => {
+    let checkOutTs: string;
+    try {
+      checkOutTs = zonedDateTimeToUtcIso(sessionDate, autoCloseTime, timezone);
+    } catch (error) {
+      console.error(`[cron-auto-close] Invalid timezone/time for ${session.id}:`, error);
+      continue;
+    }
+    /* Previous non-timezone-aware implementation retained below for migration context.
+    (() => {
       // Build a timestamptz for autoCloseTime on sessionDate in org timezone.
       // e.g. "2026-05-14" + "23:59" in "Asia/Dhaka" → UTC timestamp.
       const [hh, mm] = autoCloseTime.split(':').map(Number);
@@ -171,13 +183,18 @@ Deno.serve(async (req: Request) => {
       // For accurate tz-aware storage, the cron runs frequently enough that
       // small offset errors are acceptable (±1 tick of 5 min).
       return localMidnight.toISOString();
-    })();
+    })(); */
 
     const { error: updateErr } = await admin
       .from('attendance')
       .update({
         check_out: checkOutTs,
         remarks: existingRemarks + closeRemark,
+        modified_via: 'SYSTEM',
+        change_reason: reasonCode,
+        requires_review: true,
+        review_status: 'PENDING',
+        auto_closed_at: now.toISOString(),
         updated: new Date().toISOString(),
       })
       .eq('id', session.id);

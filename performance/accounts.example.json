@@ -1,0 +1,10 @@
+[
+  {
+    "email": "loadtest-field-001@example.invalid",
+    "password": "replace-with-a-staging-only-password"
+  },
+  {
+    "email": "loadtest-manager-001@example.invalid",
+    "password": "replace-with-a-staging-only-password"
+  }
+]

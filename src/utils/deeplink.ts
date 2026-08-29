@@ -76,6 +76,19 @@ const ROUTE_TABLE: RouteEntry[] = [
   // -- Attendance audit --
   { regex: /^#\/attendance-audit\/?$/,        path: 'attendance-audit', paramNames: [] },
 
+  // -- Customer visits --
+  { regex: /^#\/visits\/?$/,                  path: 'visits',           paramNames: [] },
+  { regex: /^#\/visit-exceptions\/?$/,        path: 'visit-exceptions', paramNames: [] },
+
+  // -- CRM --
+  { regex: /^#\/leads\/?$/,                   path: 'leads',            paramNames: [] },
+  { regex: /^#\/follow-ups\/?$/,              path: 'follow-ups',       paramNames: [] },
+  { regex: /^#\/deals\/?$/,                   path: 'deals',            paramNames: [] },
+  { regex: /^#\/collections\/?$/,             path: 'collections',      paramNames: [] },
+  { regex: /^#\/field-performance\/?$/,       path: 'field-performance',paramNames: [] },
+  { regex: /^#\/field-bi\/?$/,                path: 'field-bi',         paramNames: [] },
+  { regex: /^#\/sync-center\/?$/,             path: 'sync-center',      paramNames: [] },
+
   // -- Leave (specific request) --
   { regex: /^#\/leave\/([^/]+)$/,             path: 'leave',           paramNames: ['openLeaveId'] },
   // -- Leave list --
@@ -117,6 +130,15 @@ const REVERSE_MAP: Record<string, HashBuilder> = {
   },
   'attendance-logs':      (p) => p?.filterEmployeeId ? `#/attendance/${p.filterEmployeeId}` : '#/attendance',
   'attendance-audit':     () => '#/attendance-audit',
+  'visits':               () => '#/visits',
+  'visit-exceptions':     () => '#/visit-exceptions',
+  'leads':                () => '#/leads',
+  'follow-ups':           () => '#/follow-ups',
+  'deals':                () => '#/deals',
+  'collections':          () => '#/collections',
+  'field-performance':    () => '#/field-performance',
+  'field-bi':             () => '#/field-bi',
+  'sync-center':          () => '#/sync-center',
   'leave':                (p) => p?.openLeaveId ? `#/leave/${p.openLeaveId}` : '#/leaves',
   'performance-review':   () => '#/reviews',
   'reports':              () => '#/reports',

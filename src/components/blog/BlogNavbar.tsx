@@ -51,12 +51,11 @@ const BlogNavbar: React.FC<BlogNavbarProps> = ({ onBack: _onBack, onRegisterClic
             {/* Logo */}
             <div className={dlBrand.trigger} onClick={goHome}>
               <div className={dlBrand.frame}>
-                <img src="/img/logo.webp" className="w-full h-full object-contain" alt="OpenHRApp" />
+                <img src="/img/logo.webp" className="w-full h-full object-contain" alt="Vardhnam Agro" />
               </div>
               <span className={dlBrand.word}>
-                <span className={dlBrand.wordInk}>Open</span>
-                <span className={dlBrand.wordAccent}>HR</span>
-                <span className={dlBrand.wordInk}>App</span>
+                <span className={dlBrand.wordAccent}>Vardhnam</span>
+                <span className={dlBrand.wordInk}> FieldForce</span>
               </span>
             </div>
 

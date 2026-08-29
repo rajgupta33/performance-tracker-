@@ -72,12 +72,11 @@ const BlogFooter: React.FC = () => {
           <div className={dlFooter.brandCol}>
             <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={goHome}>
               <div className={dlBrand.frameSmall}>
-                <img src="/img/logo.webp" className="w-full h-full object-contain" alt="OpenHRApp" />
+                <img src="/img/logo.webp" className="w-full h-full object-contain" alt="Vardhnam Agro" />
               </div>
               <span className={dlBrand.word}>
-                <span className={dlBrand.wordOnSlab}>Open</span>
-                <span className={dlBrand.wordAccentOnSlab}>HR</span>
-                <span className={dlBrand.wordOnSlab}>App</span>
+                <span className={dlBrand.wordAccentOnSlab}>Vardhnam</span>
+                <span className={dlBrand.wordOnSlab}> FieldForce</span>
               </span>
             </div>
             <p className={dlFooter.blurb}>
@@ -108,7 +107,7 @@ const BlogFooter: React.FC = () => {
         {/* Bottom Bar */}
         <div className={dlFooter.bottomBar}>
           <p className={dlFooter.fine}>
-            &copy; {new Date().getFullYear()} OpenHRApp. All rights reserved.
+            &copy; {new Date().getFullYear()} Vardhnam FieldForce. All rights reserved.
           </p>
 
           {/* Social Links */}

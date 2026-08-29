@@ -148,17 +148,17 @@ self.addEventListener('push', (event: PushEvent) => {
     try {
       payload = event.data.json();
     } catch {
-      payload = { title: 'OpenHRApp', body: event.data.text() };
+      payload = { title: 'Vardhnam FieldForce', body: event.data.text() };
     }
   }
   // Empty push (no payload) — show generic notification
 
-  const title = payload.title ?? 'OpenHRApp';
+  const title = payload.title ?? 'Vardhnam FieldForce';
   const options = {
     body: payload.body ?? '',
     icon: payload.icon ?? '/img/icon-192.png',
     badge: '/img/icon-192.png',
-    tag: payload.tag ?? 'openhr-checkin',
+    tag: payload.tag ?? 'vardhnam-fieldforce',
     renotify: true,
     data: { url: payload.url ?? '/dashboard' },
     vibrate: [200, 100, 200],

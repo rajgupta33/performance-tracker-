@@ -39,6 +39,8 @@ export const hrService = {
   saveAttendance: attendanceService.saveAttendance,
   updateAttendance: attendanceService.updateAttendance,
   deleteAttendance: attendanceService.deleteAttendance,
+  getAttendanceAuditEvents: attendanceService.getAttendanceAuditEvents,
+  reviewAttendanceException: attendanceService.reviewAttendanceException,
   retryPendingSelfies: attendanceService.retryPendingSelfies,
   drainCheckInQueue: attendanceService.drainCheckInQueue,
 

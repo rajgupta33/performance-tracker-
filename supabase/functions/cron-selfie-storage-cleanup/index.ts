@@ -1,216 +1,98 @@
-// OpenHR — Selfie Storage Cleanup Cron
-// Schedule: 0 2 * * * (daily 2 AM UTC)
-//
-// Deletes actual selfie files from Supabase Storage for attendance records
-// older than the configured retention period, THEN nulls the DB column.
-//
-// The SQL-only cron (0009_cron_setup.sql) only nulls the selfie column —
-// it cannot delete Storage objects because that requires a service-role
-// HTTP call. This Edge Function fills that gap.
-
+// Vardhnam evidence retention worker. The legacy function name is retained so
+// existing cron schedules call the hardened implementation. Deletion defaults
+// to dry-run unless EVIDENCE_RETENTION_EXECUTE=true.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const SELFIE_BUCKET = 'selfies';
-const DEFAULT_RETENTION_DAYS = 30;
-const MAX_DELETE_BATCH = 500; // Supabase Storage remove() limit per call
+type Candidate = {
+  organization_id: string;
+  source_type: 'ATTENDANCE' | 'VISIT' | 'COLLECTION';
+  record_id: string;
+  bucket_id: 'selfies' | 'visit-evidence' | 'collection-proof';
+  object_path: string;
+};
 
-function jsonResponse(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+const response = (status: number, body: unknown) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+});
 
 Deno.serve(async (req: Request) => {
-  // ── Auth guard ────────────────────────────────────────────────────────────
   const cronSecret = Deno.env.get('CRON_SECRET');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const authHeader = req.headers.get('Authorization') || '';
-
-  // Three valid ways to authenticate:
-  // 1. pg_net internal call: Authorization: Bearer <CRON_SECRET> (bypasses Kong)
-  // 2. External call with service_role key: Authorization: Bearer <service_role_key>
-  // 3. External call with x-cron-secret header (when passing anon key to Kong)
   const cronHeader = req.headers.get('x-cron-secret');
-  const isCronSecret = cronSecret && (authHeader === `Bearer ${cronSecret}` || cronHeader === cronSecret);
-  const isServiceRole = serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`;
+  const authorized = Boolean(
+    (cronSecret && (authHeader === `Bearer ${cronSecret}` || cronHeader === cronSecret))
+    || (serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`)
+  );
+  if (!authorized) return response(401, { success: false, message: 'Unauthorized' });
 
-  if (!isCronSecret && !isServiceRole) {
-    return jsonResponse(401, { success: false, message: 'Unauthorized' });
+  let body: { dryRun?: boolean; limit?: number } = {};
+  try { if (req.method !== 'GET') body = await req.json(); } catch { body = {}; }
+  const executionEnabled = Deno.env.get('EVIDENCE_RETENTION_EXECUTE') === 'true';
+  const dryRun = body.dryRun ?? !executionEnabled;
+  if (!dryRun && !executionEnabled) {
+    return response(409, { success: false, message: 'Deletion is disabled. Set EVIDENCE_RETENTION_EXECUTE=true after policy approval.' });
   }
+  const limit = Math.max(1, Math.min(Number(body.limit) || 500, 1000));
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey!);
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const admin = createClient(supabaseUrl, serviceKey);
+  const { data: run, error: runError } = await admin.from('evidence_cleanup_runs')
+    .insert({ dry_run: dryRun }).select('id').single();
+  if (runError || !run) return response(500, { success: false, message: runError?.message || 'Could not create cleanup run.' });
 
-  console.log('[cron-selfie-storage-cleanup] Starting selfie storage cleanup...');
-
+  let deleted = 0;
+  let failed = 0;
   try {
-    // ── Read retention setting ────────────────────────────────────────────
-    let retentionDays = DEFAULT_RETENTION_DAYS;
-    try {
-      const { data: setting } = await admin
-        .from('settings')
-        .select('value')
-        .eq('key', 'selfie_retention_days')
-        .maybeSingle();
-      if (setting?.value) {
-        const parsed = parseInt(String(setting.value), 10);
-        if (!isNaN(parsed) && parsed > 0) retentionDays = parsed;
-      }
-    } catch (e) {
-      console.warn('[cron-selfie-storage-cleanup] Could not read retention setting, using default:', DEFAULT_RETENTION_DAYS);
+    const { data, error } = await admin.rpc('list_expired_evidence', { p_limit: limit });
+    if (error) throw error;
+    const candidates = (data || []) as Candidate[];
+    const auditItems = candidates.map((candidate) => ({
+      run_id: run.id, organization_id: candidate.organization_id, source_type: candidate.source_type,
+      record_id: candidate.record_id, bucket_id: candidate.bucket_id, object_path: candidate.object_path,
+      outcome: dryRun ? 'DRY_RUN' : 'PENDING',
+    }));
+    if (auditItems.length > 0) {
+      const { error: auditError } = await admin.from('evidence_cleanup_items').insert(auditItems);
+      if (auditError) throw auditError;
     }
 
-    // ── Calculate cutoff date ──────────────────────────────────────────────
-    const cutoffDate = new Date();
-    cutoffDate.setUTCHours(0, 0, 0, 0);
-    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    for (const candidate of candidates) {
+      if (dryRun) continue;
 
-    console.log(`[cron-selfie-storage-cleanup] Retention: ${retentionDays} days — cleaning selfies older than ${cutoffStr}`);
-
-    // ── Fetch records with selfies older than cutoff ───────────────────────
-    // Process in batches to handle large datasets
-    let totalCleaned = 0;
-    let totalErrors = 0;
-    let totalStorageDeleted = 0;
-    let hasMore = true;
-    let page = 0;
-    const pageSize = 500;
-
-    while (hasMore) {
-      const { data: records, error: fetchError } = await admin
-        .from('attendance')
-        .select('id, selfie')
-        .lt('date', cutoffStr)
-        .not('selfie', 'is', null)
-        .order('date', { ascending: true })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (fetchError) {
-        console.error('[cron-selfie-storage-cleanup] Fetch error:', fetchError);
-        break;
-      }
-
-      if (!records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      console.log(`[cron-selfie-storage-cleanup] Processing batch ${page + 1}: ${records.length} records`);
-
-      // ── Collect unique selfie paths ────────────────────────────────────
-      const paths: string[] = [];
-      const recordIds: string[] = [];
-
-      for (const r of records) {
-        if (r.selfie && typeof r.selfie === 'string' && r.selfie.trim()) {
-          paths.push(r.selfie.trim());
-          recordIds.push(r.id);
-        }
-      }
-
-      // ── Delete from Supabase Storage ────────────────────────────────────
-      if (paths.length > 0) {
-        // Supabase Storage remove() accepts up to 1000 paths per call,
-        // but we chunk at MAX_DELETE_BATCH for safety.
-        for (let i = 0; i < paths.length; i += MAX_DELETE_BATCH) {
-          const chunk = paths.slice(i, i + MAX_DELETE_BATCH);
-          try {
-            const { data: delResult, error: delError } = await admin.storage
-              .from(SELFIE_BUCKET)
-              .remove(chunk);
-
-            if (delError) {
-              console.error(`[cron-selfie-storage-cleanup] Storage delete error (chunk ${i}):`, delError.message);
-              totalErrors += chunk.length;
-            } else {
-              const deleted = delResult?.filter(d => d.error == null).length ?? chunk.length;
-              totalStorageDeleted += deleted;
-              if (delResult) {
-                const failedInBatch = delResult.filter(d => d.error != null).length;
-                totalErrors += failedInBatch;
-              }
-            }
-          } catch (e: any) {
-            console.error(`[cron-selfie-storage-cleanup] Storage delete exception (chunk ${i}):`, e?.message || e);
-            totalErrors += chunk.length;
-          }
-        }
-      }
-
-      // ── Null the selfie column in DB ────────────────────────────────────
-      if (recordIds.length > 0) {
-        for (let i = 0; i < recordIds.length; i += 100) {
-          const idChunk = recordIds.slice(i, i + 100);
-          try {
-            const { error: updateError } = await admin
-              .from('attendance')
-              .update({ selfie: null, updated: new Date().toISOString() })
-              .in('id', idChunk);
-
-            if (updateError) {
-              console.error('[cron-selfie-storage-cleanup] DB update error:', updateError.message);
-              totalErrors += idChunk.length;
-            } else {
-              totalCleaned += idChunk.length;
-            }
-          } catch (e: any) {
-            console.error('[cron-selfie-storage-cleanup] DB update exception:', e?.message || e);
-            totalErrors += idChunk.length;
-          }
-        }
-      }
-
-      page++;
-      if (records.length < pageSize) hasMore = false;
-    }
-
-    // ── Log cleanup results ──────────────────────────────────────────────
-    const logData = {
-      lastRun: new Date().toISOString(),
-      recordsCleaned: totalCleaned,
-      storageFilesDeleted: totalStorageDeleted,
-      errors: totalErrors,
-      retentionDays,
-      cutoffDate: cutoffStr,
-    };
-
-    try {
-      const { data: existing } = await admin
-        .from('settings')
-        .select('id')
-        .eq('key', 'selfie_cleanup_log')
-        .maybeSingle();
-
-      if (existing) {
-        await admin
-          .from('settings')
-          .update({ value: JSON.stringify(logData), updated: new Date().toISOString() })
-          .eq('id', existing.id);
-      } else {
-        // Insert into the first available organization (or leave org_id null)
-        await admin.from('settings').insert({
-          key: 'selfie_cleanup_log',
-          value: JSON.stringify(logData),
+      let outcome: 'DELETED' | 'FAILED' = 'FAILED';
+      let itemError: string | undefined;
+      try {
+        const { error: deleteError } = await admin.storage.from(candidate.bucket_id).remove([candidate.object_path]);
+        if (deleteError) throw deleteError;
+        const { data: referenceCleared, error: clearError } = await admin.rpc('mark_evidence_deleted', {
+          p_source_type: candidate.source_type,
+          p_record_id: candidate.record_id,
+          p_expected_path: candidate.object_path,
         });
+        if (clearError) throw clearError;
+        if (!referenceCleared) throw new Error('Database evidence reference changed during cleanup.');
+        outcome = 'DELETED';
+        deleted += 1;
+      } catch (error: any) {
+        itemError = error?.message || 'Unknown cleanup error';
+        failed += 1;
       }
-    } catch (logErr: any) {
-      console.warn('[cron-selfie-storage-cleanup] Could not persist cleanup log:', logErr?.message || logErr);
+      const { error: auditError } = await admin.from('evidence_cleanup_items').update({ outcome, error: itemError })
+        .eq('run_id', run.id).eq('source_type', candidate.source_type).eq('record_id', candidate.record_id);
+      if (auditError) throw auditError;
     }
-
-    console.log(`[cron-selfie-storage-cleanup] Done. DB cleaned=${totalCleaned} storage_deleted=${totalStorageDeleted} errors=${totalErrors}`);
-    return jsonResponse(200, {
-      success: true,
-      retentionDays,
-      recordsCleaned: totalCleaned,
-      storageFilesDeleted: totalStorageDeleted,
-      errors: totalErrors,
-    });
-
-  } catch (err: any) {
-    console.error('[cron-selfie-storage-cleanup] Fatal error:', err?.message || err);
-    return jsonResponse(500, { success: false, message: err?.message || 'Internal error' });
+    await admin.from('evidence_cleanup_runs').update({
+      status: 'COMPLETED', completed_at: new Date().toISOString(), candidate_count: candidates.length,
+      deleted_count: deleted, failed_count: failed,
+    }).eq('id', run.id);
+    return response(200, { success: true, runId: run.id, dryRun, candidates: candidates.length, deleted, failed });
+  } catch (error: any) {
+    const message = error?.message || 'Evidence cleanup failed.';
+    await admin.from('evidence_cleanup_runs').update({
+      status: 'FAILED', completed_at: new Date().toISOString(), deleted_count: deleted,
+      failed_count: failed, error: message,
+    }).eq('id', run.id);
+    return response(500, { success: false, runId: run.id, dryRun, deleted, failed, message });
   }
 });

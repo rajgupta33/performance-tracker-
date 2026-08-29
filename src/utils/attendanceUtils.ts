@@ -33,9 +33,18 @@ export const consolidateAttendance = (logs: Attendance[]): Attendance[] => {
       if (log.remarks && !existing.remarks?.includes(log.remarks)) {
         existing.remarks = existing.remarks ? `${existing.remarks} | ${log.remarks}` : log.remarks;
       }
+
+      // Preserve exception-review metadata when a workday contains multiple punches.
+      if (log.reviewStatus === 'PENDING' || log.requiresReview) {
+        existing.requiresReview = true;
+        existing.reviewStatus = 'PENDING';
+        existing.changeReason = log.changeReason;
+        existing.autoClosedAt = log.autoClosedAt;
+        existing.id = log.id;
+      }
       
       // 4. Update ID to latest to ensure operations work on a valid record (optional choice)
-      existing.id = log.id; 
+      if (existing.reviewStatus !== 'PENDING') existing.id = log.id;
     }
   });
 

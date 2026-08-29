@@ -3,46 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>OpenHRApp — Free Open-Source HR Management Software</title>
+  <title>Vardhnam FieldForce</title>
 
   <!-- SEO Meta Tags -->
-  <meta name="description" content="OpenHRApp is a free, open-source HR management platform with attendance tracking, leave management, and employee directory. Completely free forever — no credit card required.">
-  <meta name="author" content="OpenHRApp">
-  <meta name="robots" content="index, follow">
+  <meta name="description" content="Vardhnam's secure field execution app for attendance, customer visits, pipeline, collections and performance.">
+  <meta name="author" content="Vardhnam">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="canonical" href="https://openhrapp.com/">
-  <link rel="alternate" type="application/rss+xml" title="OpenHRApp Blog RSS Feed" href="https://openhrapp.com/feed.xml">
+  <link rel="alternate" type="application/rss+xml" title="Vardhnam FieldForce updates" href="https://openhrapp.com/feed.xml">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://openhrapp.com/">
-  <meta property="og:title" content="OpenHRApp — Free Open-Source HR Management Software">
-  <meta property="og:description" content="Free, open-source HR management system with attendance tracking, leave management, employee directory, and compliance tools for modern organizations.">
+  <meta property="og:title" content="Vardhnam FieldForce — Field Performance Tracker">
+  <meta property="og:description" content="Installable field execution software for customer visits, pipeline, collections, targets, and performance tracking.">
   <!-- PNG, not WebP: Facebook, LinkedIn, X, and WhatsApp do not render WebP in
        link previews, so a .webp here yields a card with no image at all.
        Explicit dimensions and type make the large card render on first scrape. -->
-  <meta property="og:image" content="https://openhrapp.com/img/screenshot-wide.png">
-  <meta property="og:image:secure_url" content="https://openhrapp.com/img/screenshot-wide.png">
+  <meta property="og:image" content="https://openhrapp.com/img/logo.png">
+  <meta property="og:image:secure_url" content="https://openhrapp.com/img/logo.png">
   <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="1920">
-  <meta property="og:image:height" content="1080">
-  <meta property="og:image:alt" content="OpenHRApp — free open-source HR management software">
-  <meta property="og:site_name" content="OpenHRApp">
+  <meta property="og:image:width" content="400">
+  <meta property="og:image:height" content="378">
+  <meta property="og:image:alt" content="Vardhnam FieldForce performance dashboard">
+  <meta property="og:site_name" content="Vardhnam FieldForce">
   <meta property="og:locale" content="en_US">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@openhrapp">
-  <meta name="twitter:title" content="OpenHRApp — Free Open-Source HR Management Software">
-  <meta name="twitter:description" content="Free, open-source HR management system with attendance tracking, leave management, employee directory, and compliance tools for modern organizations.">
-  <meta name="twitter:image" content="https://openhrapp.com/img/screenshot-wide.png">
-  <meta name="twitter:image:alt" content="OpenHRApp — free open-source HR management software">
+  <meta name="twitter:title" content="Vardhnam FieldForce — Field Performance Tracker">
+  <meta name="twitter:description" content="Installable field execution software for customer visits, pipeline, collections, targets, and performance tracking.">
+  <meta name="twitter:image" content="https://openhrapp.com/img/logo.png">
+  <meta name="twitter:image:alt" content="Vardhnam FieldForce performance dashboard">
 
   <!-- PWA & iOS Specific Meta Tags -->
-  <meta name="theme-color" content="#fcfdfe">
+  <meta name="theme-color" content="#1f7a31">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="OpenHRApp">
+  <meta name="apple-mobile-web-app-title" content="Vardhnam FieldForce">
 
   <!-- Organization + WebSite Structured Data -->
   <script type="application/ld+json">
@@ -51,17 +51,17 @@
     "@graph": [
       {
         "@type": "Organization",
-        "name": "OpenHRApp",
+        "name": "Vardhnam FieldForce",
         "url": "https://openhrapp.com",
-        "logo": "https://openhrapp.com/img/logo.webp",
-        "description": "Free, open-source HR management system with attendance tracking, leave management, employee directory, and compliance tools.",
+        "logo": "https://openhrapp.com/img/logo.png",
+        "description": "Installable field execution and performance tracking software for Vardhnam.",
         "sameAs": [
           "https://github.com/mimnets/OpenHRApp"
         ]
       },
       {
         "@type": "WebSite",
-        "name": "OpenHRApp",
+        "name": "Vardhnam FieldForce",
         "url": "https://openhrapp.com",
         "potentialAction": {
           "@type": "SearchAction",
@@ -90,7 +90,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/img/icon-192.png">
   <link rel="apple-touch-icon" sizes="167x167" href="/img/icon-192.png">
   
-  <link rel="icon" type="image/webp" href="/img/mobile-logo.webp">
+  <link rel="icon" type="image/png" href="/img/icon-192.png">
   <!-- Vital: Link to manifest at the root level -->
   <link rel="manifest" href="/manifest.json">
   
@@ -121,7 +121,7 @@
 
         // Update theme-color meta tag to dark
         var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', '#0f172a');
+        if (meta) meta.setAttribute('content', '#0b160e');
       }
     } catch(e) {}
   })();
@@ -142,7 +142,7 @@
 <link rel="modulepreload" href="https://esm.sh/react@19.2.3">
 <link rel="modulepreload" href="https://esm.sh/react-dom@19.2.3/client">
 </head>
-<body class="bg-[#fcfdfe] text-slate-900">
+<body class="bg-[#f7fbf7] text-slate-900">
   <div id="root">
     <!--
       Static Hero Skeleton — instant first paint for visitors & SEO crawlers.

@@ -10,8 +10,8 @@ interface NotFoundPageProps {
 const NotFoundPage: React.FC<NotFoundPageProps> = ({ onGoHome }) => {
   useEffect(() => {
     updatePageMeta(
-      '404 — Page Not Found | OpenHRApp',
-      'The page you are looking for does not exist or has been moved. Return to the OpenHRApp homepage.'
+      '404 — Page Not Found | Vardhnam FieldForce',
+      'The page you are looking for does not exist or has been moved. Return to the Vardhnam FieldForce homepage.'
     );
 
     // Inject noindex so soft-404s don't get indexed (the SPA returns HTTP 200
@@ -64,12 +64,11 @@ const NotFoundPage: React.FC<NotFoundPageProps> = ({ onGoHome }) => {
         <div className="mt-12 pt-8 border-t border-slate-200">
           <div className="flex items-center justify-center gap-2">
             <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center p-1.5 border border-primary/20 shadow-sm overflow-hidden">
-              <img src="/img/logo.webp" className="w-full h-full object-contain" alt="OpenHRApp" />
+              <img src="/img/logo.webp" className="w-full h-full object-contain" alt="Vardhnam Agro" />
             </div>
             <span className="text-sm font-semibold tracking-tight">
-              <span className="text-primary">Open</span>
-              <span className="text-[#f59e0b]">HR</span>
-              <span className="text-[#10b981]">App</span>
+              <span className="text-primary">Vardhnam</span>
+              <span className="text-[#b9500a]"> FieldForce</span>
             </span>
           </div>
         </div>

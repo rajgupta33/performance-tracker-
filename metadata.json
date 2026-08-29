@@ -1,6 +1,6 @@
 {
-  "name": "OPEN-HR-APP",
-  "description": "A comprehensive HR management system tailored for Bangladesh-based organizations (100-500 employees), featuring local compliance, attendance tracking, and leave management.",
+  "name": "Vardhnam FieldForce",
+  "description": "A mobile-first field execution platform for attendance, customer visits, pipeline, collections and target performance.",
   "requestFramePermissions": [
     "camera",
     "geolocation"

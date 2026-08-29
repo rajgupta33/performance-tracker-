@@ -14,7 +14,9 @@ import path from 'path';
  * hex. Here the ratios are recomputed from the stylesheet on every run.
  */
 
-const css = fs.readFileSync(path.resolve(__dirname, '../index.css'), 'utf8');
+// Normalize Windows CRLF so the contract checks the CSS rather than the
+// developer's platform-specific checkout settings.
+const css = fs.readFileSync(path.resolve(__dirname, '../index.css'), 'utf8').replace(/\r\n/g, '\n');
 
 /** Pull a custom property from a specific block of the stylesheet. */
 function token(name: string, scope: 'light' | 'dark'): string {
@@ -231,8 +233,8 @@ describe('elevation is always two layers', () => {
 
 describe('the app keeps its own tokens', () => {
   it('--primary is untouched, so the logged-in app is unaffected', () => {
-    expect(css).toContain('--primary: #4a6fa5;');
-    expect(css).toContain('--primary-hover: #3b5d8c;');
+    expect(css).toContain('--primary: #1f7a31;');
+    expect(css).toContain('--primary-hover: #155d24;');
   });
 
   it('no Daylight token overwrites a --primary one', () => {

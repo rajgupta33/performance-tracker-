@@ -54,10 +54,20 @@ const Upgrade = lazyWithReload(() => import('./pages/Upgrade'));
 const PerformanceReview = lazyWithReload(() => import('./pages/PerformanceReview'));
 const Announcements = lazyWithReload(() => import('./pages/Announcements'));
 const AdminNotifications = lazyWithReload(() => import('./pages/AdminNotifications'));
+const VisitsPage = lazyWithReload(() => import('./features/visits/VisitsPage'));
+const LeadsPage = lazyWithReload(() => import('./features/crm/leads/LeadsPage'));
+const FollowUpsPage = lazyWithReload(() => import('./features/crm/followups/FollowUpsPage'));
+const DealsPage = lazyWithReload(() => import('./features/crm/deals/DealsPage'));
+const CollectionsPage = lazyWithReload(() => import('./features/collections/CollectionsPage'));
+const FieldPerformancePage = lazyWithReload(() => import('./features/performance/PerformancePage'));
+const FieldBiPage = lazyWithReload(() => import('./features/bi/FieldBiPage'));
+const VisitExceptionsPage = lazyWithReload(() => import('./features/visits/VisitExceptionsPage'));
+const SyncCenterPage = lazyWithReload(() => import('./features/sync/SyncCenterPage'));
 
 import { navigateTo } from './utils/seo';
 import { getCurrentRoute, navigateToRoute, replaceRoute } from './utils/deeplink';
 import { PushPermissionPrompt } from './components/PushPermissionPrompt';
+import { featureFlags } from './config/features';
 
 // Parse features route from pathname
 const parseFeaturesRoute = (pathname: string) => {
@@ -110,7 +120,9 @@ const AppContent: React.FC = () => {
   const [navParams, setNavParams] = useState<any>(null);
 
   // Public Pages State
-  const [showLanding, setShowLanding] = useState(true);
+  // Internal deployment defaults directly to the employee login. Public
+  // marketing routes remain isolated until they are removed in a later commit.
+  const [showLanding, setShowLanding] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -525,7 +537,7 @@ const AppContent: React.FC = () => {
       return <RegisterOrganization onBack={() => { setShowRegister(false); setShowLanding(true); }} onSuccess={login} />;
     }
     if (!showLanding) {
-      return <Login onLoginSuccess={login} onRegisterClick={() => setShowRegister(true)} onBackToLanding={() => setShowLanding(true)} />;
+      return <Login onLoginSuccess={login} />;
     }
     return (
       <LandingPage
@@ -574,6 +586,33 @@ const AppContent: React.FC = () => {
         );
       case 'attendance-logs': return <AttendanceLogs user={user} viewMode="MY" filterEmployeeId={navParams?.filterEmployeeId} />;
       case 'attendance-audit': return <AttendanceLogs user={user} viewMode="AUDIT" />;
+      case 'visits': return featureFlags.visits
+        ? <VisitsPage user={user} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'leads': return featureFlags.leads
+        ? <LeadsPage onNavigate={handleNavigate} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'follow-ups': return featureFlags.leads
+        ? <FollowUpsPage />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'deals': return featureFlags.deals
+        ? <DealsPage />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'collections': return featureFlags.collections
+        ? <CollectionsPage user={user} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'field-performance': return featureFlags.targetPerformance
+        ? <FieldPerformancePage user={user} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'field-bi': return featureFlags.fieldBI && ['ADMIN', 'HR', 'MANAGER'].includes(user.role)
+        ? <FieldBiPage onNavigate={handleNavigate} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'visit-exceptions': return featureFlags.fieldBI && featureFlags.visits && ['ADMIN', 'HR', 'MANAGER'].includes(user.role)
+        ? <VisitExceptionsPage />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
+      case 'sync-center': return featureFlags.syncCenter
+        ? <SyncCenterPage user={user} />
+        : <Dashboard user={user} onNavigate={handleNavigate} />;
       case 'leave': return <Leave user={user} autoOpen={navParams?.autoOpen} openLeaveId={navParams?.openLeaveId} />;
       case 'announcements': return <Announcements user={user} />;
       case 'admin-notifications': return <AdminNotifications user={user} />;

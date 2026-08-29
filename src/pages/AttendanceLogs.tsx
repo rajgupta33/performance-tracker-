@@ -3,10 +3,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Clock, MapPin, History, Search, RefreshCw, ChevronRight, ExternalLink,
   Camera, X, SortAsc, SortDesc, Users, Building, Trash2, Save,
-  Calculator, UserX
+  Calculator, UserX, ShieldAlert, CheckCircle2, FileClock
 } from 'lucide-react';
 import { hrService } from '../services/hrService';
-import { Attendance, Employee, AppConfig } from '../types';
+import { Attendance, AttendanceChangeEvent, Employee, AppConfig } from '../types';
 import { consolidateAttendance, calculatePunctuality, calculateDuration } from '../utils/attendanceUtils';
 import HelpButton from '../components/onboarding/HelpButton';
 import { useToast } from '../context/ToastContext';
@@ -48,10 +48,17 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
   const [searchTerm, setSearchTerm] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
+  const [exceptionFilter, setExceptionFilter] = useState<'ALL' | 'PENDING' | 'AUTO_CLOSED'>('ALL');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   
   const [selectedLog, setSelectedLog] = useState<Attendance | null>(null);
   const [editState, setEditState] = useState<Partial<Attendance>>({});
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
+  const [auditEvents, setAuditEvents] = useState<AttendanceChangeEvent[]>([]);
+  const selectedNeedsReview = Boolean(
+    isAuditMode && selectedLog && (selectedLog.reviewStatus === 'PENDING' || selectedLog.requiresReview),
+  );
   
   // Local Override State for Calculation (Not saved to DB, just for calculating status)
   const [tempShift, setTempShift] = useState({ start: '09:00', end: '18:00', grace: 0 });
@@ -133,6 +140,9 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
 
   const handleOpenDetail = async (log: Attendance) => {
     setSelectedLog(log);
+    setCorrectionReason('');
+    setReviewNote('');
+    setAuditEvents([]);
 
     // Initialize Edit State with proper formatting
     setEditState({
@@ -153,6 +163,12 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
       end: ensureTimeFormat(shift?.endTime || config?.officeEndTime || '18:00'),
       grace: shift?.lateGracePeriod ?? config?.lateGracePeriod ?? 0
     });
+
+    try {
+      setAuditEvents(await hrService.getAttendanceAuditEvents(log.id));
+    } catch (error) {
+      console.warn('Attendance audit history is unavailable', error);
+    }
   };
 
   const handleManualAbsent = async () => {
@@ -196,11 +212,16 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
   const handleUpdate = async () => {
     if (!isAdmin) return;
     if (!selectedLog) return;
+    if (correctionReason.trim().length < 5) {
+      showToast('Add a correction reason of at least 5 characters.', 'error');
+      return;
+    }
     setIsProcessing(true);
     try {
       // Restore '-' if empty string to maintain convention
       const finalState = {
         ...editState,
+        changeReason: correctionReason.trim(),
         checkIn: editState.checkIn || '-',
         checkOut: editState.checkOut || '-'
       };
@@ -209,6 +230,35 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
       await fetchInitialData();
     } catch (err) {
       showToast("Failed to update record.", 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReview = async (decision: 'APPROVED' | 'CORRECTED') => {
+    if (!selectedLog || reviewNote.trim().length < 5) {
+      showToast('Add a review note of at least 5 characters.', 'error');
+      return;
+    }
+    if (decision === 'CORRECTED' && !editState.checkOut) {
+      showToast('Enter the corrected check-out time.', 'error');
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await hrService.reviewAttendanceException(
+        selectedLog.id,
+        decision,
+        reviewNote,
+        editState.checkOut,
+        editState.date,
+      );
+      setSelectedLog(null);
+      showToast(decision === 'APPROVED' ? 'Auto-close approved.' : 'Check-out corrected.', 'success');
+      await fetchInitialData();
+    } catch (error) {
+      console.error(error);
+      showToast('Failed to review attendance exception.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -234,6 +284,11 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
     }
 
     if (isAuditMode) {
+      if (exceptionFilter === 'PENDING') {
+        result = result.filter(log => log.reviewStatus === 'PENDING' || log.requiresReview);
+      } else if (exceptionFilter === 'AUTO_CLOSED') {
+        result = result.filter(log => Boolean(log.autoClosedAt) || log.changeReason?.startsWith('AUTO_CLOSE'));
+      }
       if (employeeFilter !== 'ALL') {
         result = result.filter(log => log.employeeId === employeeFilter);
       }
@@ -257,7 +312,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
       const timeB = b.checkIn || "";
       return sortOrder === 'desc' ? -timeA.localeCompare(timeB) : timeA.localeCompare(timeB);
     });
-  }, [logs, searchTerm, employeeFilter, deptFilter, sortOrder, isAuditMode, employees]);
+  }, [logs, searchTerm, employeeFilter, deptFilter, exceptionFilter, sortOrder, isAuditMode, employees]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -335,6 +390,19 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                   </select>
                 </div>
               )}
+              <div className="relative flex-1">
+                <ShieldAlert className="absolute left-5 top-1/2 -translate-y-1/2 text-amber-500" size={18} />
+                <select
+                  aria-label="Attendance exception filter"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] text-sm font-bold outline-none appearance-none"
+                  value={exceptionFilter}
+                  onChange={(e) => setExceptionFilter(e.target.value as typeof exceptionFilter)}
+                >
+                  <option value="ALL">All Records</option>
+                  <option value="PENDING">Needs Review</option>
+                  <option value="AUTO_CLOSED">Auto-Closed</option>
+                </select>
+              </div>
             </>
           )}
 
@@ -383,6 +451,11 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                     }`}>
                       {log.status}
                     </span>
+                    {(log.reviewStatus === 'PENDING' || log.requiresReview) && (
+                      <span className="px-2.5 py-1 rounded-lg text-[8px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 flex items-center gap-1">
+                        <ShieldAlert size={10} /> Needs review
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
                     {isAuditMode && (
@@ -556,13 +629,24 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                     <input 
                       type="time" 
                       step="1"
-                      readOnly={!isAdmin}
-                      className={`w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-semibold text-sm ${!isAdmin ? 'opacity-70 cursor-not-allowed' : 'focus:ring-4 focus:ring-primary-light transition-all'}`}
+                      readOnly={!isAdmin && !selectedNeedsReview}
+                      className={`w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-semibold text-sm ${!isAdmin && !selectedNeedsReview ? 'opacity-70 cursor-not-allowed' : 'focus:ring-4 focus:ring-primary-light transition-all'}`}
                       value={editState.checkOut || ''}
                       onChange={e => setEditState({...editState, checkOut: e.target.value})}
                     />
                  </div>
               </div>
+
+              {selectedLog.autoClosedAt && (
+                <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+                  <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-widest flex items-center gap-2">
+                    <ShieldAlert size={14} /> Auto-closed attendance exception
+                  </p>
+                  <p className="text-xs text-amber-900">
+                    Reason: {(selectedLog.changeReason || 'AUTO_CLOSE').replaceAll('_', ' ')} · Review: {selectedLog.reviewStatus || 'PENDING'}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-2">
@@ -576,6 +660,58 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                    <a href={`https://www.google.com/maps?q=${selectedLog.location?.lat},${selectedLog.location?.lng}`} target="_blank" rel="noreferrer" className="p-3 bg-white text-primary rounded-xl shadow-sm border border-slate-50 hover:bg-primary hover:text-white transition-all"><ExternalLink size={18} /></a>
                 </div>
               </div>
+
+              {isAdmin && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-1">Required correction reason</label>
+                  <input
+                    type="text"
+                    value={correctionReason}
+                    onChange={(e) => setCorrectionReason(e.target.value)}
+                    placeholder="Why is this record being changed?"
+                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium outline-none focus:ring-4 focus:ring-primary-light"
+                  />
+                </div>
+              )}
+
+              {isAuditMode && auditEvents.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                    <FileClock size={12} /> Immutable change history
+                  </p>
+                  <div className="border border-slate-100 rounded-2xl divide-y divide-slate-100 overflow-hidden">
+                    {auditEvents.slice(0, 8).map((event) => (
+                      <div key={event.id} className="p-4 flex items-start justify-between gap-4 bg-slate-50/50">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{event.reasonCode.replaceAll('_', ' ')}</p>
+                          <p className="text-[9px] font-semibold text-slate-400 uppercase">{event.actorType} · {event.changeType}</p>
+                        </div>
+                        <time className="text-[9px] text-slate-400 whitespace-nowrap">{new Date(event.created).toLocaleString()}</time>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isAuditMode && selectedNeedsReview && (
+                <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-4">
+                  <label className="text-[9px] font-semibold text-amber-800 uppercase tracking-widest">Manager review note</label>
+                  <textarea
+                    value={reviewNote}
+                    onChange={(e) => setReviewNote(e.target.value)}
+                    placeholder="Confirm why this auto-close is valid, or explain the correction."
+                    className="w-full p-4 bg-white border border-amber-200 rounded-xl text-sm min-h-[80px] outline-none"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button onClick={() => handleReview('APPROVED')} disabled={isProcessing} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-semibold uppercase tracking-widest flex justify-center items-center gap-2">
+                      <CheckCircle2 size={15} /> Approve auto-close
+                    </button>
+                    <button onClick={() => handleReview('CORRECTED')} disabled={isProcessing} className="flex-1 py-3 bg-amber-600 text-white rounded-xl text-[10px] font-semibold uppercase tracking-widest flex justify-center items-center gap-2">
+                      <Save size={15} /> Save corrected check-out
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-1">Workday Activity Audit Trail</label>

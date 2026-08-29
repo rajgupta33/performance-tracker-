@@ -16,8 +16,16 @@ import {
   ClipboardCheck,
   Megaphone,
   Bell,
+  MapPin,
+  UserPlus,
+  ListTodo,
+  BriefcaseBusiness,
+  Banknote,
+  Target,
+  RefreshCw,
 } from 'lucide-react';
 import HelpButton from './onboarding/HelpButton';
+import { featureFlags } from '../config/features';
 
 interface SidebarProps {
   currentPath: string;
@@ -41,6 +49,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPath, onNavigate, onLogout, ro
     { id: 'profile', label: 'My Profile', icon: UserCircle, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
     { id: 'attendance-logs', label: 'My Attendance', icon: History, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
     { id: 'attendance-audit', label: 'Attendance Audit', icon: List, roles: ['ADMIN', 'HR', 'MANAGER'] },
+    ...(featureFlags.visits ? [{ id: 'visits', label: 'Customer Visits', icon: MapPin, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.leads ? [{ id: 'leads', label: 'Lead Pipeline', icon: UserPlus, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.leads ? [{ id: 'follow-ups', label: 'Follow-ups', icon: ListTodo, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.deals ? [{ id: 'deals', label: 'Deals', icon: BriefcaseBusiness, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.collections ? [{ id: 'collections', label: 'Collections', icon: Banknote, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.targetPerformance ? [{ id: 'field-performance', label: 'My Performance', icon: Target, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
+    ...(featureFlags.fieldBI ? [{ id: 'field-bi', label: 'Field Force BI', icon: BarChart3, roles: ['ADMIN', 'HR', 'MANAGER'] }] : []),
+    ...(featureFlags.fieldBI && featureFlags.visits ? [{ id: 'visit-exceptions', label: 'Visit Reviews', icon: ClipboardCheck, roles: ['ADMIN', 'HR', 'MANAGER'] }] : []),
+    ...(featureFlags.syncCenter ? [{ id: 'sync-center', label: 'Sync Center', icon: RefreshCw, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] }] : []),
     { id: 'leave', label: 'Leave', icon: CalendarDays, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
     { id: 'admin-notifications', label: 'Notifications', icon: Bell, roles: ['ADMIN', 'HR'] },
@@ -116,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPath, onNavigate, onLogout, ro
           </button>
 
           <div className="text-center">
-            <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-[0.3em]">OpenHRApp v2.9.0</p>
+            <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-[0.3em]">Vardhnam FieldForce</p>
           </div>
         </div>
       </nav>

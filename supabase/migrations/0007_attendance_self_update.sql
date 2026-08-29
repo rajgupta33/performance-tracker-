@@ -17,7 +17,7 @@ create policy "attendance_update" on public.attendance for update using (
     organization_id = public.auth_org_id()
     and (
       public.auth_role() in ('ADMIN','HR','MANAGER')
-      or employee_id = auth.uid()
+      or employee_id = auth.uid()::text
     )
   )
 );

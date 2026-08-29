@@ -1,6 +1,6 @@
 # Attendance & Workday Standards — Industry Reference + OpenHR Gap Analysis
 
-**Status:** Reference document. Last reviewed 2026-04-18.
+**Status:** Reference document. Last reviewed 2026-08-27.
 **Audience:** OpenHR product owner and any future contributor (human or AI)
 making decisions about workday, session, and check-in/check-out behavior.
 **Why this exists:** The "forgotten check-out leaves the session active
@@ -18,11 +18,28 @@ This document captures:
 2. The patterns commercial vendors actually ship for workday handling
    and forgotten check-outs.
 3. A point-by-point comparison of OpenHR's current behavior to those
-   patterns, with an honest gap analysis.
+patterns, with an honest gap analysis.
 4. A recommended roadmap, tiered Now / Next / Later.
 
 This is **not** legal advice. It is a product reference rooted in publicly
 documented vendor behavior and US Department of Labor (FLSA) guidance.
+
+## Implementation update (2026-08-27)
+
+The Supabase implementation now includes:
+
+- IANA-timezone-aware conversion of each organization's local auto-close
+  cutoff to an exact UTC timestamp, including daylight-saving offsets.
+- Structured auto-close reason codes and a pending-review flag.
+- An immutable `attendance_change_events` history containing actor type,
+  before/after states, reason, and timestamp.
+- A manager audit filter for pending and auto-closed sessions.
+- Approve/correct actions with a required review note; manual administrator
+  corrections also require a reason.
+
+These changes are defined by migration `0041_attendance_audit_reviews.sql`.
+They do not feed attendance into performance scoring. The employee-initiated
+missed-punch request form and payroll lock remain future work.
 
 ---
 

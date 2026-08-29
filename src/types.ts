@@ -149,12 +149,29 @@ export interface Attendance {
   date: string;
   checkIn?: string;
   checkOut?: string;
-  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | 'EARLY_OUT' | 'HALF_DAY';
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | 'EARLY_OUT' | 'HALF_DAY' | 'HOLIDAY' | 'REMOTE';
   location?: { lat: number; lng: number; address?: string };
   remarks?: string;
   selfie?: string;
   dutyType?: 'OFFICE' | 'FACTORY';
   organizationId?: string;
+  changeReason?: string;
+  modifiedVia?: 'USER' | 'MANAGER' | 'SYSTEM';
+  requiresReview?: boolean;
+  reviewStatus?: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'CORRECTED';
+  autoClosedAt?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
+export interface AttendanceChangeEvent {
+  id: string;
+  attendanceId: string;
+  actorType: 'USER' | 'MANAGER' | 'SYSTEM';
+  changeType: 'CREATED' | 'UPDATED' | 'DELETED' | 'REVIEWED';
+  reasonCode: string;
+  note?: string;
+  created: string;
 }
 
 export interface LeaveRequest {

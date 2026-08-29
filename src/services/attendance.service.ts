@@ -1,7 +1,7 @@
 
 import { supabase, isSupabaseConfigured } from './supabase';
 import { apiClient, dedupe } from './api.client';
-import { Attendance } from '../types';
+import { Attendance, AttendanceChangeEvent } from '../types';
 import { organizationService } from './organization.service';
 import { notificationService } from './notification.service';
 import { workdaySessionManager } from './workday/workdaySessionManager';
@@ -189,6 +189,13 @@ const mapAttendance = (r: any): Attendance => ({
   remarks: r.remarks || '',
   dutyType: r.duty_type as any,
   organizationId: r.organization_id,
+  changeReason: r.change_reason || undefined,
+  modifiedVia: r.modified_via || undefined,
+  requiresReview: Boolean(r.requires_review),
+  reviewStatus: r.review_status || 'NOT_REQUIRED',
+  autoClosedAt: r.auto_closed_at || undefined,
+  reviewedAt: r.reviewed_at || undefined,
+  reviewNote: r.review_note || undefined,
 });
 
 export const attendanceService = {
@@ -432,7 +439,48 @@ export const attendanceService = {
     if (data.checkOut) updates.check_out = hhmmToISO(data.checkOut, targetDate);
     if (data.remarks !== undefined) updates.remarks = data.remarks;
     if (data.status)   updates.status = data.status;
+    if (data.changeReason !== undefined) updates.change_reason = data.changeReason;
     const { error } = await supabase.from('attendance').update(updates).eq('id', id.trim());
+    if (error) throw error;
+    attendanceService.clearCache();
+    apiClient.notify();
+  },
+
+  async getAttendanceAuditEvents(attendanceId: string): Promise<AttendanceChangeEvent[]> {
+    if (!isSupabaseConfigured()) return [];
+    const { data, error } = await supabase
+      .from('attendance_change_events')
+      .select('id, attendance_id, actor_type, change_type, reason_code, note, created')
+      .eq('attendance_id', attendanceId.trim())
+      .order('created', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((event: any) => ({
+      id: event.id,
+      attendanceId: event.attendance_id,
+      actorType: event.actor_type,
+      changeType: event.change_type,
+      reasonCode: event.reason_code,
+      note: event.note || undefined,
+      created: event.created,
+    }));
+  },
+
+  async reviewAttendanceException(
+    attendanceId: string,
+    decision: 'APPROVED' | 'CORRECTED',
+    note: string,
+    correctedCheckOut?: string,
+    attendanceDate?: string,
+  ) {
+    if (!isSupabaseConfigured()) return;
+    const { error } = await supabase.rpc('review_attendance_exception', {
+      p_attendance_id: attendanceId.trim(),
+      p_decision: decision,
+      p_note: note.trim(),
+      p_check_out: decision === 'CORRECTED'
+        ? hhmmToISO(correctedCheckOut, attendanceDate)
+        : null,
+    });
     if (error) throw error;
     attendanceService.clearCache();
     apiClient.notify();

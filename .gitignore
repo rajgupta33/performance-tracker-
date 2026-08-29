@@ -65,3 +65,8 @@ Others/import-backups/
 
 # OMC operational state
 .omc/
+
+# Performance-test credentials and generated evidence
+performance/accounts.json
+artifacts/performance/*
+!artifacts/performance/.gitkeep

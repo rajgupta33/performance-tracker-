@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Database, Menu, X, LayoutDashboard, Clock, CalendarDays, UserCircle, Sun, Moon } from 'lucide-react';
+import { Database, Menu, X, LayoutDashboard, Clock, CalendarDays, UserCircle, Sun, Moon, MapPin } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import NotificationBell from '../components/notifications/NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SubscriptionBanner } from '../components/subscription';
+import { featureFlags } from '../config/features';
 
 
 interface MainLayoutProps {
@@ -69,9 +70,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, onNaviga
 
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                  <div className="p-1.5 bg-white rounded-xl border border-primary/20 shadow-sm overflow-hidden md:hidden flex-shrink-0">
-                    <img src="./img/logo.webp" className="w-10 h-10 object-contain" alt="Logo" />
+                    <img src="/img/logo.webp" className="w-10 h-10 object-contain" alt="Vardhnam Agro" />
                  </div>
-                 <h2 className="font-semibold text-xl tracking-tighter text-primary md:hidden truncate min-w-0">OpenHRApp</h2>
+                 <h2 className="font-semibold text-xl tracking-tighter text-primary md:hidden truncate min-w-0">FieldForce</h2>
                  <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border bg-slate-50 text-slate-400 border-slate-100">
                    <Database size={12} />
                    <span className="text-[9px] font-semibold uppercase tracking-widest">Cloud Node Alpha</span>
@@ -130,12 +131,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, onNaviga
             <Clock size={20} className={currentPath === 'attendance-logs' || currentPath === 'attendance-audit' ? 'scale-110' : ''} />
             <span className="text-[9px] font-semibold uppercase tracking-tighter">History</span>
           </button>
-          <button 
-            onClick={() => handleNavigate('leave')}
-            className={`flex flex-col items-center gap-1 transition-all ${currentPath === 'leave' ? 'text-primary' : 'text-slate-400'}`}
+          <button
+            onClick={() => handleNavigate(featureFlags.visits ? 'visits' : 'leave')}
+            className={`flex flex-col items-center gap-1 transition-all ${currentPath === (featureFlags.visits ? 'visits' : 'leave') ? 'text-primary' : 'text-slate-400'}`}
           >
-            <CalendarDays size={20} className={currentPath === 'leave' ? 'scale-110' : ''} />
-            <span className="text-[9px] font-semibold uppercase tracking-tighter">Leave</span>
+            {featureFlags.visits
+              ? <MapPin size={20} className={currentPath === 'visits' ? 'scale-110' : ''} />
+              : <CalendarDays size={20} className={currentPath === 'leave' ? 'scale-110' : ''} />}
+            <span className="text-[9px] font-semibold uppercase tracking-tighter">{featureFlags.visits ? 'Visits' : 'Leave'}</span>
           </button>
           <button 
             onClick={() => handleNavigate('profile')}

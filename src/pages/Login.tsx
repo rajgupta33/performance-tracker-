@@ -24,7 +24,7 @@ import { useToast } from '../context/ToastContext';
 
 interface LoginProps {
   onLoginSuccess: (user: any) => void;
-  onRegisterClick: () => void;
+  onRegisterClick?: () => void;
   onBackToLanding?: () => void;
   initError?: string;
 }
@@ -37,17 +37,13 @@ const BrandLogo = () => (
         <img
           src="/img/logo.webp"
           className="w-full h-full object-contain"
-          alt="OpenHRApp Logo"
+          alt="Vardhnam FieldForce logo"
         />
       </div>
     </div>
     <div className="text-center">
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tighter flex items-center justify-center">
-        <span className="text-primary">Open</span>
-        <span className="text-[#f59e0b]">HR</span>
-        <span className="text-[#10b981]">App</span>
-      </h1>
-      <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">Personnel Gateway</p>
+      <h1 className="text-3xl md:text-4xl font-semibold tracking-tighter text-primary">Vardhnam</h1>
+      <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">FieldForce Gateway</p>
     </div>
   </div>
 );
@@ -522,13 +518,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onRegisterClick, onBackTo
                   Forgot Password?
                 </button>
 
-                <button
-                  type="button"
-                  onClick={onRegisterClick}
-                  className="w-full py-3 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl font-semibold text-[10px] uppercase tracking-widest hover:bg-white hover:border-slate-300 transition-all flex items-center justify-center gap-2"
-                >
-                  <Building2 size={14} /> Register New Organization
-                </button>
+                {onRegisterClick && (
+                  <button
+                    type="button"
+                    onClick={onRegisterClick}
+                    className="w-full py-3 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl font-semibold text-[10px] uppercase tracking-widest hover:bg-white hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Building2 size={14} /> Register New Organization
+                  </button>
+                )}
 
                 {/* Back to Home */}
                 {onBackToLanding && (
@@ -649,7 +647,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onRegisterClick, onBackTo
                       </div>
                       <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-2xl">
                          <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary"><Download size={18} /></div>
-                         <div className="text-xs font-bold text-slate-700">2. Select <span className="text-slate-900">Install App</span> or <span className="text-slate-900">Install OpenHRApp</span></div>
+                         <div className="text-xs font-bold text-slate-700">2. Select <span className="text-slate-900">Install App</span> or <span className="text-slate-900">Install Vardhnam FieldForce</span></div>
                       </div>
                    </div>
                 </div>

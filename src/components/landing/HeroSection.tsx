@@ -184,7 +184,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onLoginClick, onRegisterClick
 
             {isIOS ? (
               <div className="space-y-3">
-                <p className="text-dl-xs text-dl-muted font-medium">Install OpenHRApp on your iPhone or iPad:</p>
+                <p className="text-dl-xs text-dl-muted font-medium">Install Vardhnam FieldForce on your iPhone or iPad:</p>
                 <div className="flex items-center gap-3 p-3 bg-dl-surface-2 rounded-dl-md">
                   <div className="w-8 h-8 rounded-dl-sm bg-dl-surface shadow-dl-1 flex items-center justify-center text-dl-teal"><Share size={16} /></div>
                   <p className="text-dl-xs font-semibold text-dl-ink">1. Tap the <span className="text-dl-teal">Share</span> button in Safari</p>
@@ -200,7 +200,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onLoginClick, onRegisterClick
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-dl-xs text-dl-muted font-medium">Install OpenHRApp from your browser:</p>
+                <p className="text-dl-xs text-dl-muted font-medium">Install Vardhnam FieldForce from your browser:</p>
                 <div className="flex items-center gap-3 p-3 bg-dl-surface-2 rounded-dl-md">
                   <div className="w-8 h-8 rounded-dl-sm bg-dl-surface shadow-dl-1 flex items-center justify-center text-dl-muted"><MoreVertical size={16} /></div>
                   <p className="text-dl-xs font-semibold text-dl-ink">1. Tap the <span className="text-dl-ink">Menu</span> button (&#8942; or &#8943;)</p>

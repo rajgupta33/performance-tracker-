@@ -159,11 +159,11 @@ export const useCamera = () => {
   }, [facingMode]);
 
   /** Fallback: open the device camera via <input type=file capture> when live stream isn't available */
-  const takePhoto = useCallback(async (): Promise<string | null> => {
+  const takePhoto = useCallback(async (captureMode: 'user' | 'environment' = 'user'): Promise<string | null> => {
     try {
       setLoading(true);
       setError(null);
-      const file = await pickImageFile('user');
+      const file = await pickImageFile(captureMode);
       if (!file) return null;
       const webp = await convertToWebP(file, 0.7, 1080);
       return await blobToDataURL(webp);

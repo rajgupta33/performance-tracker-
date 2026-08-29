@@ -27,7 +27,7 @@ export type DarkModePreference = 'light' | 'dark' | 'system';
 const DARK_MODE_KEY = 'openhr-dark-mode';
 
 /** The <meta name="theme-color"> value per mode, matching the painted surface. */
-const META_THEME_COLOR = { dark: '#0f172a', light: '#fcfdfe' } as const;
+const META_THEME_COLOR = { dark: '#0b160e', light: '#1f7a31' } as const;
 
 /**
  * Read the saved preference synchronously, for use as initial state.

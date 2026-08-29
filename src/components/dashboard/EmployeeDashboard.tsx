@@ -5,6 +5,7 @@ import { DashboardData } from '../../hooks/dashboard/useDashboard';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardStats } from './DashboardStats';
 import { AnnouncementWidget } from './AnnouncementWidget';
+import { FieldActionGrid } from './FieldActionGrid';
 
 interface Props {
   data: DashboardData;
@@ -22,6 +23,8 @@ export const EmployeeDashboard: React.FC<Props> = ({ data, isLoading, onNavigate
         isLoading={isLoading}
         onNavigate={onNavigate} 
       />
+
+      <FieldActionGrid onNavigate={onNavigate} />
 
       <DashboardStats 
         leaveUsed={data.leaveUsed} 

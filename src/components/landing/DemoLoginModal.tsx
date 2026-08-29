@@ -40,7 +40,7 @@ const BrandLogo = () => (
         <img
           src="/img/logo.webp"
           className="w-full h-full object-contain"
-          alt="OpenHRApp Logo"
+          alt="Vardhnam Agro logo"
         />
       </div>
     </div>
