@@ -26,7 +26,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
 
   // 1. Logic Hooks
   const {
-    currentTime, activeRecord, appConfig, isLoading, status, submitPunch
+    currentTime, activeRecord, appConfig, isLoading, isRefreshing, loadError, status, submitPunch, retryLoad
   } = useAttendance(user, onFinish);
 
   const {
@@ -91,7 +91,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
       return;
     }
 
-    if (status !== 'idle' || !location) return;
+    if (status !== 'idle' || !location || loadError || isRefreshing) return;
 
     let selfieData: string | null = null;
 
@@ -164,15 +164,31 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
         </div>
       )}
 
+      {loadError && (
+        <div className="px-4 py-3 bg-amber-50 border-t border-amber-200 flex items-center gap-3 text-amber-800">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <span className="text-xs font-medium flex-1">{loadError}</span>
+          <button
+            type="button"
+            onClick={() => retryLoad().catch(() => undefined)}
+            disabled={isRefreshing}
+            className="rounded-lg bg-amber-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider disabled:opacity-50"
+          >
+            {isRefreshing ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
+      )}
+
       <AttendanceActions
         dutyType={dutyType}
         dutyLabel={dutyType === 'FACTORY' ? (appConfig?.dutyLabel2 || 'Factory') : (appConfig?.dutyLabel1 || 'Office')}
         remarks={remarks}
         setRemarks={setRemarks}
+        onDutyTypeChange={setDutyType}
         onSubmit={handlePunchSubmit}
         status={status}
         activeRecord={activeRecord}
-        isDisabled={!canPunch || !location || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
+        isDisabled={!canPunch || isRefreshing || !!loadError || !location || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
       />
 
       <canvas ref={canvasRef} className="hidden" />

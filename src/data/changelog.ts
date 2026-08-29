@@ -15,6 +15,15 @@ export interface ChangelogRelease {
 
 export const changelog: ChangelogRelease[] = [
   {
+    date: '2026-08-30',
+    title: 'Attendance punching is safer at midnight and during sync failures',
+    entries: [
+      { type: 'fix', description: 'Attendance now derives the work date and late-check wall clock from the organization timezone while storing the exact captured instant. This prevents punches around UTC midnight from being assigned to the previous or next workday.' },
+      { type: 'fix', description: 'The punch action stays disabled when the current attendance session cannot be synchronized, with a visible retry action. If a punch was saved but the follow-up refresh fails, the app now says it was saved instead of reporting a false failure that could prompt a duplicate punch.' },
+      { type: 'improvement', description: 'Employees opening the main attendance screen can choose Office or Field / Factory before checking in; an active session keeps its original duty type.' },
+    ],
+  },
+  {
     date: '2026-08-22',
     title: 'Day 15 no longer switches your account off, and you can now choose to be featured on our homepage',
     entries: [

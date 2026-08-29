@@ -8,6 +8,7 @@ interface Props {
   dutyLabel?: string;
   remarks: string;
   setRemarks: (val: string) => void;
+  onDutyTypeChange: (value: 'OFFICE' | 'FACTORY') => void;
   onSubmit: () => void;
   status: 'idle' | 'loading' | 'success';
   isDisabled: boolean;
@@ -15,13 +16,30 @@ interface Props {
 }
 
 export const AttendanceActions: React.FC<Props> = ({
-  dutyType, dutyLabel, remarks, setRemarks, onSubmit, status, isDisabled, activeRecord
+  dutyType, dutyLabel, remarks, setRemarks, onDutyTypeChange, onSubmit, status, isDisabled, activeRecord
 }) => {
   const displayLabel = dutyLabel || (dutyType === 'FACTORY' ? 'Factory' : 'Office');
 
   return (
     <div className="px-8 pt-4 pb-12 flex flex-col items-center gap-4">
       <div className="w-full max-w-[320px] space-y-2">
+        {!activeRecord && (
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1" aria-label="Attendance duty type">
+            {(['OFFICE', 'FACTORY'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onDutyTypeChange(value)}
+                aria-pressed={dutyType === value}
+                className={`rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                  dutyType === value ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                {value === 'OFFICE' ? 'Office' : 'Field / Factory'}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-2 flex items-center gap-1.5">
           {dutyType === 'FACTORY' && <AlertCircle size={10} className="text-emerald-500" />}
           {displayLabel} {dutyType === 'FACTORY' && "(Mandatory)"}

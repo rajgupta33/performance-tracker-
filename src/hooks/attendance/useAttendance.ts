@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { hrService } from '../../services/hrService';
 import { Attendance, AppConfig, Shift } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { getAttendanceClock } from '../../utils/attendanceTime';
 
 export const useAttendance = (user: any, onFinish?: () => void) => {
   const { showToast } = useToast();
@@ -11,6 +12,8 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [employeeShift, setEmployeeShift] = useState<Shift | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   // Clock Timer
@@ -20,6 +23,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   }, []);
 
   const refreshData = useCallback(async () => {
+    setIsRefreshing(true);
     try {
       // Drain any selfie uploads that were queued after a previous failure
       // (see RC#4 in Others/SCALING_IMPLEMENTATION_LOG.md). Fire-and-forget —
@@ -31,7 +35,6 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       // Fire-and-forget — failures are reclassified + rescheduled inside.
       hrService.drainCheckInQueue?.().catch(() => { /* handled inside */ });
 
-      const today = new Date().toISOString().split('T')[0];
       const [reconciled, config, shift] = await Promise.all([
         hrService.getActiveAttendanceWithReconciliation(user.id),
         hrService.getConfig(),
@@ -39,6 +42,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       ]);
 
       const { active, closedPast } = reconciled;
+      const today = getAttendanceClock(new Date(), config.timezone || 'UTC').date;
 
       if (active && active.date !== today) {
         setActiveRecord(undefined);
@@ -47,6 +51,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       }
       setAppConfig(config);
       setEmployeeShift(shift);
+      setLoadError(null);
 
       // If the workday session manager just closed any past-date sessions
       // as a client-side fallback, surface a one-time, human-readable toast.
@@ -59,14 +64,23 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       }
     } catch (e) {
       console.error('Data sync failed', e);
+      setLoadError('Attendance could not be synchronized. Retry before punching to avoid a duplicate record.');
+      throw e;
+    } finally {
+      setIsRefreshing(false);
     }
   }, [user.id, user.shiftId, showToast]);
 
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
-      await refreshData();
-      setIsLoading(false);
+      try {
+        await refreshData();
+      } catch {
+        // refreshData exposes a readable error for the attendance screen.
+      } finally {
+        setIsLoading(false);
+      }
     };
     init();
   }, [refreshData]);
@@ -79,12 +93,14 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   ) => {
     setStatus('loading');
     try {
-      const punchTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-      const today = new Date().toISOString().split('T')[0];
+      if (loadError) throw new Error('Attendance state is not synchronized');
+      const clock = getAttendanceClock(new Date(), appConfig?.timezone || 'UTC');
+      const punchTime = clock.time;
+      const today = clock.date;
 
       if (activeRecord && !activeRecord.checkOut) {
         // Clock Out
-        await hrService.updateAttendance(activeRecord.id, { checkOut: punchTime, remarks });
+        await hrService.updateAttendance(activeRecord.id, { checkOut: clock.capturedAt, remarks });
       } else {
         // Clock In
         let punchStatus: Attendance['status'] = 'PRESENT';
@@ -111,7 +127,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
           employeeId: user.id, 
           employeeName: user.name, 
           date: today,
-          checkIn: punchTime, 
+          checkIn: clock.capturedAt,
           status: punchStatus, 
           location, 
           selfie: selfieData, 
@@ -121,7 +137,13 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       }
       
       setStatus('success');
-      await refreshData();
+      try {
+        await refreshData();
+      } catch {
+        // The punch is already durable. Do not tell the employee it failed or
+        // encourage a duplicate; the next screen load will reconcile it.
+        showToast('Attendance was saved, but the latest status could not be refreshed.', 'warning');
+      }
       
       // Auto-close after success
       setTimeout(() => {
@@ -140,7 +162,10 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
     activeRecord,
     appConfig,
     isLoading,
+    isRefreshing,
+    loadError,
     status,
-    submitPunch
+    submitPunch,
+    retryLoad: refreshData,
   };
 };
