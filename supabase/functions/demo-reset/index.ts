@@ -127,6 +127,21 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (existingProfile) {
+        // Keep the Auth password synchronized with DEMO_USER_PASSWORD so a
+        // reset remains a true reset even after the demo users already exist.
+        const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(
+          existingProfile.id,
+          {
+            password: demoPassword,
+            email_confirm: true,
+            user_metadata: { name: def.name },
+          },
+        );
+
+        if (authUpdateErr) {
+          throw new Error(`Failed to reset auth user ${def.email}: ${authUpdateErr.message}`);
+        }
+
         // Update org_id and role in case they drifted
         await supabase
           .from('profiles')
