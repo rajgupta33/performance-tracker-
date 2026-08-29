@@ -51,11 +51,18 @@ The Supabase implementation now includes:
 - Ordinary employee updates to attendance rows are rejected. The guard keeps
   only the existing past-day client auto-close and asynchronous check-in selfie
   link as narrow compatibility paths.
+- Employees can submit a missed-punch correction for an existing record or a
+  wholly missing day within 90 days. One request per employee/date remains
+  pending until an authorized manager, HR user, or administrator approves or
+  rejects it with a review note.
+- Approved requests apply through a server function, notify the employee, and
+  write the corrected attendance through the immutable change-history trigger.
+  Submission notifies the line manager/team leader and HR administrators.
 
 These changes are defined by migrations `0041_attendance_audit_reviews.sql`
-through `0043_attendance_verified_checkout.sql`.
-They do not feed attendance into performance scoring. The employee-initiated
-missed-punch request form and payroll lock remain future work.
+through `0044_attendance_correction_requests.sql`.
+They do not feed attendance into performance scoring. Payroll-period locking
+remains future work.
 
 ---
 
@@ -304,19 +311,19 @@ This section references real files in the repo so a reader can verify.
 | 4.2 Auto-close at shift end (with grace) | **Have, partial.** We close at `autoSessionCloseTime`, but the same-day rule fires the moment wall-clock crosses that boundary, with no grace specifically for the close decision. |
 | 4.3 Max-hours threshold | **Missing.** Closure is time-of-day-based, not session-duration-based. A 14-hour overnight session that started before midnight is not protected. |
 | 4.4 Fixed daily cutoff | **Have.** Falls back to `23:59` if no shift/org config exists. |
-| 4.5 Zero-out + manager approval | **Missing.** The system writes a fabricated check-out; payroll sees a "complete" record. |
-| 4.6 Manual-only with exceptions queue | **Missing.** Auto-closed records are not surfaced on a manager review queue distinct from normal records. |
+| 4.5 Zero-out + manager approval | **Partial.** Auto-close still writes a time, but the record is flagged for review and can be approved or corrected with an immutable history entry. |
+| 4.6 Manual-only with exceptions queue | **Have, alongside auto-close.** Managers have separate auto-close and employee correction queues, though OpenHR still uses automated closure rather than a manual-only policy. |
 
 ### 7.3 Audit-trail compliance
 
 | Requirement | OpenHR status |
 |---|---|
-| Distinguish system vs human | **Partial.** Achieved via the remark suffix, which is parseable but unstructured. The change reason is not a structured field. |
-| Before/after values | **Missing.** We update `check_out` in place without persisting the original empty value. |
-| Actor identification | **Missing.** No `modified_by` / `modified_via` field on attendance records. |
+| Distinguish system vs human | **Have.** `change_reason` and `modified_via` distinguish employee, manager, and system changes; legacy remark suffixes remain for compatibility. |
+| Before/after values | **Have.** `attendance_change_events` stores immutable before/after JSON for every attendance mutation. |
+| Actor identification | **Have.** Attendance stores `modified_by` / `modified_via`, and each change event records actor ID/type. |
 | Employee notification | **Have** (in-app bell from the cron path). The client fallback shows a toast but does not currently create a persistent notification. |
-| Manager review queue | **Missing.** |
-| Missed-punch correction workflow | **Missing.** Employees must rely on an admin to edit via the attendance audit page. |
+| Manager review queue | **Have.** Auto-close exceptions and employee correction requests are visible in the attendance audit surface. |
+| Missed-punch correction workflow | **Have.** Employee request, scoped manager/HR decision, required notes, notifications, and audited application are implemented. |
 
 ### 7.4 FLSA-style retention check
 
@@ -335,18 +342,13 @@ Ordered by user-visible impact.
    warning before auto-close. We send nothing.
 2. **No "still working?" extend control.** When the cutoff hits, the
    employee has no one-tap way to keep the session open from the app.
-3. **No manager review queue.** Auto-closed sessions are
-   indistinguishable from normal ones in the manager UI except by
-   reading the remark text.
-4. **No missed-punch correction request workflow.** Employees cannot
-   self-serve; they must email an admin or wait for the audit page.
-5. **No max-hours auto-stop.** A session opened at 23:00 and forgotten
+3. **No max-hours auto-stop.** A session opened at 23:00 and forgotten
    will be closed at the next configured `autoSessionCloseTime` of the
    following day, which can result in 20+ hour fabricated sessions.
-6. **No structured audit log.** All system actions encode their reason
-   in a remark string. There is no `attendance_audit` table with
-   actor, before, after, timestamp, and reason as first-class fields.
-7. **Server cron is a single point of failure.** The client fallback
+4. **No payroll lock/finalization window.** Corrections are limited to
+   90 days, but an approved historical request can still modify a period
+   after payroll has exported it because no locked-through date exists.
+5. **Server cron is a single point of failure.** The client fallback
    we added (`workdaySessionManager`) mitigates this for active
    employees but does nothing for employees on extended leave (their
    open session sits forever until they log in).
@@ -360,24 +362,11 @@ Ordered by user-visible impact.
 - **Pre-close reminder.** New cron entry that fires 30 minutes before
   each shift's `auto_session_close_time` and pushes a bell + email to
   any employee with an open session. No new schema needed.
-- **Manager review surface.** Add a filter chip on the Attendance
-  Audit page for "Auto-closed sessions" that grep the remark suffix.
-  Pure UI change.
-- **Distinguish remarks consistently.** Document the three reason
-  codes (`AUTO_CLOSE_PAST_DATE`, `AUTO_CLOSE_MAX_TIME_REACHED`,
-  `AUTO_CLOSE_CLIENT_FALLBACK`) and prefer machine-parseable tags
-  inside remarks (e.g. `[REASON:AUTO_CLOSE_PAST_DATE]`).
+- **Payroll lock.** Add a per-organization locked-through date and reject
+  employee requests or approvals that would rewrite a finalized period.
 
 ### Next (one or two iterations out)
 
-- **Missed-punch correction request.** Add an
-  `attendance_corrections` collection: employee submits date +
-  proposed check-in / check-out + reason; routes to line manager;
-  approval applies the edit and writes the audit record.
-- **Structured audit log.** Add a `modified_by`, `modified_via`
-  (`USER` / `SYSTEM` / `MANAGER_EDIT`), and `change_reason` to
-  attendance records. Persist the original `check_out` value (or
-  `null`) in a side field for system closures.
 - **Server-side cron health check.** Add an endpoint
   `GET /api/openhr/health/cron` that returns the last-run
   timestamps of each cron job. Surface a banner in the admin UI if

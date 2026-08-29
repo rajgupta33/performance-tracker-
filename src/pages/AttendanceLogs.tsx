@@ -6,10 +6,13 @@ import {
   Calculator, UserX, ShieldAlert, CheckCircle2, FileClock
 } from 'lucide-react';
 import { hrService } from '../services/hrService';
-import { Attendance, AttendanceChangeEvent, Employee, AppConfig } from '../types';
+import { Attendance, AttendanceChangeEvent, AttendanceCorrectionRequest, Employee, AppConfig } from '../types';
 import { consolidateAttendance, calculatePunctuality, calculateDuration } from '../utils/attendanceUtils';
 import HelpButton from '../components/onboarding/HelpButton';
 import { useToast } from '../context/ToastContext';
+import AttendanceCorrectionPanel from '../components/attendance/AttendanceCorrectionPanel';
+import type { AttendanceCorrectionInput } from '../services/attendance/correctionPayload';
+import { getAttendanceClock } from '../utils/attendanceTime';
 
 interface AttendanceLogsProps {
   user: any;
@@ -38,6 +41,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
   const isAuditMode = viewMode === 'AUDIT' && (isAdmin || isManager);
   
   const [logs, setLogs] = useState<Attendance[]>([]);
+  const [correctionRequests, setCorrectionRequests] = useState<AttendanceCorrectionRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -80,14 +84,16 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
         ? { since: sinceYearAgo, maxRows: 10000 }
         : { since: sinceYearAgo, employeeId: user.id, maxRows: 2000 };
 
-      const [allAttendance, fetchedEmployees, depts, appConfig] = await Promise.all([
+      const [allAttendance, fetchedEmployees, depts, appConfig, fetchedCorrections] = await Promise.all([
         hrService.getAttendance(attendanceScope),
         hrService.getEmployees(),
         hrService.getDepartments(),
-        hrService.getConfig()
+        hrService.getConfig(),
+        hrService.getAttendanceCorrectionRequests(),
       ]);
 
       setConfig(appConfig);
+      setCorrectionRequests(fetchedCorrections);
 
       if (isAuditMode) {
         if (isAdmin) {
@@ -264,6 +270,20 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
     }
   };
 
+  const handleCorrectionSubmit = async (input: AttendanceCorrectionInput) => {
+    await hrService.submitAttendanceCorrection(input);
+    await fetchInitialData();
+  };
+
+  const handleCorrectionReview = async (
+    requestId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note: string,
+  ) => {
+    await hrService.reviewAttendanceCorrection(requestId, decision, note);
+    await fetchInitialData();
+  };
+
   // Helper to re-calc status based on times AND local shift overrides
   const autoCalculateStatus = () => {
     if (!editState.checkIn) return;
@@ -415,6 +435,16 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
           </button>
         </div>
       </div>
+
+      <AttendanceCorrectionPanel
+        key={getAttendanceClock(new Date(), config?.timezone || 'UTC').date}
+        requests={correctionRequests}
+        attendance={logs}
+        isAuditMode={isAuditMode}
+        currentWorkDate={getAttendanceClock(new Date(), config?.timezone || 'UTC').date}
+        onSubmit={handleCorrectionSubmit}
+        onReview={handleCorrectionReview}
+      />
 
       <div className="space-y-4">
         {isLoading ? (

@@ -1,7 +1,7 @@
 
 import { supabase, isSupabaseConfigured } from './supabase';
 import { apiClient, dedupe } from './api.client';
-import { Attendance, AttendanceChangeEvent } from '../types';
+import { Attendance, AttendanceChangeEvent, AttendanceCorrectionRequest } from '../types';
 import { organizationService } from './organization.service';
 import { notificationService } from './notification.service';
 import { workdaySessionManager } from './workday/workdaySessionManager';
@@ -11,6 +11,7 @@ import { checkInSyncQueue, classifySyncError } from './attendance/syncQueue';
 import { CheckInSyncEntry } from './attendance/syncQueue.types';
 import { buildAttendanceCheckInParams, ensureAttendanceEventId } from './attendance/checkInPayload';
 import { buildAttendanceCheckOutParams, ensureCheckOutEventId } from './attendance/checkOutPayload';
+import { AttendanceCorrectionInput, buildAttendanceCorrectionParams, validateAttendanceCorrection } from './attendance/correctionPayload';
 
 const SELFIE_WEBP_QUALITY = 0.65;
 const SELFIE_MAX_DIMENSION = 720;
@@ -253,6 +254,26 @@ const mapAttendance = (r: any): Attendance => ({
   autoClosedAt: r.auto_closed_at || undefined,
   reviewedAt: r.reviewed_at || undefined,
   reviewNote: r.review_note || undefined,
+});
+
+const mapAttendanceCorrection = (r: any): AttendanceCorrectionRequest => ({
+  id: r.id,
+  attendanceId: r.attendance_id || undefined,
+  employeeId: String(r.employee_id || '').trim(),
+  employeeName: r.employee_name,
+  workDate: r.work_date,
+  requestType: r.request_type,
+  originalCheckIn: r.original_check_in ? isoToHHMM(r.original_check_in) : undefined,
+  originalCheckOut: r.original_check_out ? isoToHHMM(r.original_check_out) : undefined,
+  proposedCheckIn: r.proposed_check_in ? String(r.proposed_check_in).slice(0, 5) : undefined,
+  proposedCheckOut: r.proposed_check_out ? String(r.proposed_check_out).slice(0, 5) : undefined,
+  reason: r.reason || '',
+  status: r.status,
+  reviewerId: r.reviewer_id || undefined,
+  reviewerNote: r.reviewer_note || undefined,
+  reviewedAt: r.reviewed_at || undefined,
+  created: r.created,
+  organizationId: r.organization_id,
 });
 
 export const attendanceService = {
@@ -605,6 +626,46 @@ export const attendanceService = {
       note: event.note || undefined,
       created: event.created,
     }));
+  },
+
+  async getAttendanceCorrectionRequests(): Promise<AttendanceCorrectionRequest[]> {
+    if (!isSupabaseConfigured()) return [];
+    const { data, error } = await supabase
+      .from('attendance_correction_requests')
+      .select('*')
+      .order('created', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    return (data || []).map(mapAttendanceCorrection);
+  },
+
+  async submitAttendanceCorrection(input: AttendanceCorrectionInput): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const validationError = validateAttendanceCorrection(input);
+    if (validationError) throw new Error(validationError);
+    const { error } = await supabase.rpc(
+      'submit_attendance_correction_request',
+      buildAttendanceCorrectionParams(input),
+    );
+    if (error) throw error;
+    apiClient.notify();
+  },
+
+  async reviewAttendanceCorrection(
+    requestId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note: string,
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    if (note.trim().length < 5) throw new Error('Review note must contain at least 5 characters.');
+    const { error } = await supabase.rpc('review_attendance_correction_request', {
+      p_request_id: requestId.trim(),
+      p_decision: decision,
+      p_note: note.trim(),
+    });
+    if (error) throw error;
+    attendanceService.clearCache();
+    apiClient.notify();
   },
 
   async reviewAttendanceException(

@@ -27,6 +27,9 @@ export const changelog: ChangelogRelease[] = [
       { type: 'security', description: 'Employee check-outs now use a tenant-scoped database function that verifies session ownership, GPS accuracy and freshness, and that the captured check-out follows the check-in. Ordinary employee edits to attendance evidence are rejected.' },
       { type: 'fix', description: 'Offline check-outs now retain a stable event ID and remain visibly pending until synchronization. Retrying after a lost response returns the original closed session without overwriting its evidence.' },
       { type: 'improvement', description: 'Check-out GPS, capture time, selfie, and notes are stored separately from check-in evidence and displayed independently in the attendance audit view.' },
+      { type: 'feature', description: 'Employees can now request missed-punch corrections for an existing attendance record or a completely missing day. Requests are limited to the last 90 days, keep the original punches visible, and cannot change attendance until approved.' },
+      { type: 'security', description: 'Attendance correction approval is enforced by tenant and reporting scope on the server. Managers can review only direct reports or their team, every decision requires a note, and employees cannot insert or update correction records directly.' },
+      { type: 'improvement', description: 'Managers, HR, and administrators now have a correction review queue in Attendance Audit. Approval applies the proposed punches through the immutable attendance history, while submission and resolution generate in-app notifications.' },
     ],
   },
   {

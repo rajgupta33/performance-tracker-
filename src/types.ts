@@ -180,6 +180,26 @@ export interface AttendanceChangeEvent {
   created: string;
 }
 
+export interface AttendanceCorrectionRequest {
+  id: string;
+  attendanceId?: string;
+  employeeId: string;
+  employeeName: string;
+  workDate: string;
+  requestType: 'CHECK_IN' | 'CHECK_OUT' | 'BOTH';
+  originalCheckIn?: string;
+  originalCheckOut?: string;
+  proposedCheckIn?: string;
+  proposedCheckOut?: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewerId?: string;
+  reviewerNote?: string;
+  reviewedAt?: string;
+  created: string;
+  organizationId?: string;
+}
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
