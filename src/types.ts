@@ -145,6 +145,8 @@ export interface Employee extends User {
 export interface Attendance {
   id: string;
   clientEventId?: string;
+  checkOutEventId?: string;
+  targetAttendanceId?: string;
   employeeId: string;
   employeeName?: string;
   date: string;
@@ -152,8 +154,11 @@ export interface Attendance {
   checkOut?: string;
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'LEAVE' | 'EARLY_OUT' | 'HALF_DAY' | 'HOLIDAY' | 'REMOTE';
   location?: { lat: number; lng: number; address?: string; accuracyM?: number; capturedAt?: string };
+  checkOutLocation?: { lat: number; lng: number; address?: string; accuracyM?: number; capturedAt?: string };
   remarks?: string;
   selfie?: string;
+  checkOutSelfie?: string;
+  checkOutRemarks?: string;
   dutyType?: 'OFFICE' | 'FACTORY';
   organizationId?: string;
   changeReason?: string;

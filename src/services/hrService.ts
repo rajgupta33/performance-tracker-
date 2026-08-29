@@ -45,6 +45,8 @@ export const hrService = {
   retryPendingSelfies: attendanceService.retryPendingSelfies,
   drainCheckInQueue: attendanceService.drainCheckInQueue,
   hasPendingCheckIn: attendanceService.hasPendingCheckIn,
+  saveCheckOut: attendanceService.saveCheckOut,
+  hasPendingCheckOut: attendanceService.hasPendingCheckOut,
 
   // Leaves (Delegate to leaveService)
   getLeaves: leaveService.getLeaves,

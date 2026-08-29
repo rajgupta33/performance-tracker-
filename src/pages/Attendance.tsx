@@ -27,7 +27,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
 
   // 1. Logic Hooks
   const {
-    currentTime, activeRecord, appConfig, isLoading, isRefreshing, loadError, hasPendingCheckIn, status, submitPunch, retryLoad
+    currentTime, activeRecord, appConfig, isLoading, isRefreshing, loadError, hasPendingCheckIn, hasPendingCheckOut, status, submitPunch, retryLoad
   } = useAttendance(user, onFinish);
 
   const {
@@ -194,6 +194,13 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
         </div>
       )}
 
+      {hasPendingCheckOut && (
+        <div className="px-4 py-3 bg-blue-50 border-t border-blue-200 flex items-center gap-3 text-blue-800">
+          <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+          <span className="text-xs font-medium">Your check-out is waiting to sync. The session will close automatically when connectivity returns.</span>
+        </div>
+      )}
+
       <AttendanceActions
         dutyType={dutyType}
         dutyLabel={dutyType === 'FACTORY' ? (appConfig?.dutyLabel2 || 'Factory') : (appConfig?.dutyLabel1 || 'Office')}
@@ -203,7 +210,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user, autoStart, onFinish }) =>
         onSubmit={handlePunchSubmit}
         status={status}
         activeRecord={activeRecord}
-        isDisabled={!canPunch || hasPendingCheckIn || isRefreshing || !!loadError || !hasAccurateLocation || !hasFreshLocation || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
+        isDisabled={!canPunch || hasPendingCheckIn || hasPendingCheckOut || isRefreshing || !!loadError || !hasAccurateLocation || !hasFreshLocation || isLocating || status !== 'idle' || !hasPhoto || (dutyType === 'FACTORY' && !remarks.trim())}
       />
 
       <canvas ref={canvasRef} className="hidden" />

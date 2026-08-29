@@ -10,6 +10,7 @@ import { convertToWebP } from '../utils/imageConvert';
 import { checkInSyncQueue, classifySyncError } from './attendance/syncQueue';
 import { CheckInSyncEntry } from './attendance/syncQueue.types';
 import { buildAttendanceCheckInParams, ensureAttendanceEventId } from './attendance/checkInPayload';
+import { buildAttendanceCheckOutParams, ensureCheckOutEventId } from './attendance/checkOutPayload';
 
 const SELFIE_WEBP_QUALITY = 0.65;
 const SELFIE_MAX_DIMENSION = 720;
@@ -40,6 +41,7 @@ interface PendingSelfie {
   recordId: string;
   selfieDataUrl: string;
   queuedAt: number;
+  evidenceType?: 'CHECK_IN' | 'CHECK_OUT';
 }
 
 const SELFIE_QUEUE_KEY = 'openhr_pending_selfies';
@@ -63,10 +65,14 @@ const writeSelfieQueue = (queue: PendingSelfie[]) => {
   }
 };
 
-const uploadSelfieOnce = async (recordId: string, selfieDataUrl: string): Promise<void> => {
+const uploadSelfieOnce = async (
+  recordId: string,
+  selfieDataUrl: string,
+  evidenceType: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN',
+): Promise<void> => {
   if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
   const webpBlob = await convertToWebP(selfieDataUrl, SELFIE_WEBP_QUALITY, SELFIE_MAX_DIMENSION);
-  const path = `${recordId}/selfie.webp`;
+  const path = `${recordId}/${evidenceType === 'CHECK_OUT' ? 'checkout' : 'selfie'}.webp`;
   // upsert:false so Supabase Storage RLS only evaluates the INSERT policy.
   // selfies_update policy requires (storage.foldername)[1] = auth.uid() but
   // we use <recordId>/ as folder — upsert:true would trigger UPDATE eval
@@ -84,19 +90,27 @@ const uploadSelfieOnce = async (recordId: string, selfieDataUrl: string): Promis
       (uploadErr as any).statusCode === 409;
     if (!isDuplicate) throw uploadErr;
   }
-  // Patch selfie path onto the attendance record
-  const { error: updateErr } = await supabase
-    .from('attendance')
-    .update({ selfie: path })
-    .eq('id', recordId);
-  if (updateErr) throw updateErr;
+  if (evidenceType === 'CHECK_IN') {
+    // Check-in creates the row before its asynchronous evidence upload, so it
+    // still needs the path linked afterward. Check-out stores its deterministic
+    // path atomically inside submit_attendance_check_out.
+    const { error: updateErr } = await supabase
+      .from('attendance')
+      .update({ selfie: path })
+      .eq('id', recordId);
+    if (updateErr) throw updateErr;
+  }
 };
 
-const uploadSelfieWithRetry = async (recordId: string, selfieDataUrl: string): Promise<void> => {
+const uploadSelfieWithRetry = async (
+  recordId: string,
+  selfieDataUrl: string,
+  evidenceType: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN',
+): Promise<void> => {
   let lastErr: any;
   for (let attempt = 1; attempt <= MAX_SELFIE_RETRIES; attempt++) {
     try {
-      await uploadSelfieOnce(recordId, selfieDataUrl);
+      await uploadSelfieOnce(recordId, selfieDataUrl, evidenceType);
       attendanceService.clearCache();
       apiClient.notify();
       return;
@@ -107,7 +121,7 @@ const uploadSelfieWithRetry = async (recordId: string, selfieDataUrl: string): P
     }
   }
   const queue = readSelfieQueue();
-  queue.push({ recordId, selfieDataUrl, queuedAt: Date.now() });
+  queue.push({ recordId, selfieDataUrl, queuedAt: Date.now(), evidenceType });
   writeSelfieQueue(queue);
   throw lastErr;
 };
@@ -180,6 +194,16 @@ const submitVerifiedCheckIn = async (data: Attendance): Promise<string> => {
   return created.id;
 };
 
+const submitVerifiedCheckOut = async (data: Attendance): Promise<string> => {
+  const { data: updated, error } = await supabase.rpc(
+    'submit_attendance_check_out',
+    buildAttendanceCheckOutParams(data),
+  );
+  if (error) throw error;
+  if (!updated?.id) throw new Error('Attendance check-out did not return a record');
+  return updated.id;
+};
+
 // Supabase stores check_in/check_out as timestamptz (full ISO string).
 // The rest of the app expects HH:mm. Convert only when the value looks like
 // an ISO timestamp; leave bare HH:mm strings (legacy data) unchanged.
@@ -199,6 +223,7 @@ const mapAttendance = (r: any): Attendance => ({
   date: r.date,
   checkIn: isoToHHMM(r.check_in),
   checkOut: isoToHHMM(r.check_out),
+  checkOutEventId: r.check_out_event_id || undefined,
   status: r.status as any,
   location: {
     lat: Number(r.latitude) || 0,
@@ -207,8 +232,17 @@ const mapAttendance = (r: any): Attendance => ({
     accuracyM: r.location_accuracy_m == null ? undefined : Number(r.location_accuracy_m),
     capturedAt: r.location_captured_at || undefined,
   },
+  checkOutLocation: r.check_out_captured_at ? {
+    lat: Number(r.check_out_latitude) || 0,
+    lng: Number(r.check_out_longitude) || 0,
+    address: r.check_out_location || 'Unknown',
+    accuracyM: r.check_out_accuracy_m == null ? undefined : Number(r.check_out_accuracy_m),
+    capturedAt: r.check_out_captured_at,
+  } : undefined,
   // selfie stores the storage path; signed URLs resolved after fetch (private bucket)
   selfie: r.selfie || undefined,
+  checkOutSelfie: r.check_out_selfie || undefined,
+  checkOutRemarks: r.check_out_remarks || undefined,
   remarks: r.remarks || '',
   dutyType: r.duty_type as any,
   organizationId: r.organization_id,
@@ -282,9 +316,10 @@ export const attendanceService = {
         // at 1 000 paths per request; exceeding that returns an error which the
         // old code silently ignored, leaving raw storage paths that <img> can't render.
         const SIGN_CHUNK_SIZE = 500;
-        const withSelfie = !skipSelfieUrls ? result.filter(r => r.selfie) : [];
-        if (withSelfie.length > 0) {
-          const paths = withSelfie.map(r => r.selfie as string);
+        const paths = !skipSelfieUrls
+          ? result.flatMap(r => [r.selfie, r.checkOutSelfie].filter(Boolean) as string[])
+          : [];
+        if (paths.length > 0) {
           const urlMap = new Map<string, string>();
           let signFailures = 0;
 
@@ -313,6 +348,7 @@ export const attendanceService = {
           if (urlMap.size > 0) {
             result.forEach(r => {
               if (r.selfie) r.selfie = urlMap.get(r.selfie) ?? r.selfie;
+              if (r.checkOutSelfie) r.checkOutSelfie = urlMap.get(r.checkOutSelfie) ?? r.checkOutSelfie;
             });
           }
           if (signFailures > 0) {
@@ -390,6 +426,48 @@ export const attendanceService = {
     );
   },
 
+  async saveCheckOut(data: Attendance) {
+    if (!isSupabaseConfigured()) return;
+    const checkOutWithEventId = ensureCheckOutEventId(data);
+    let recordId: string;
+    try {
+      recordId = await submitVerifiedCheckOut(checkOutWithEventId);
+    } catch (err: any) {
+      const syncErr = classifySyncError(err);
+      if (syncErr.retryable) {
+        try {
+          checkInSyncQueue.enqueue({
+            kind: 'CHECK_OUT',
+            payload: checkOutWithEventId,
+            occurredAt: Date.now(),
+          });
+          console.warn('[AttendanceService] Check-out enqueued for later sync:', syncErr.code);
+          return { queued: true as const };
+        } catch (enqueueErr) {
+          console.error('[AttendanceService] Could not enqueue check-out:', enqueueErr);
+        }
+      }
+      throw err;
+    }
+    attendanceService.clearCache();
+    apiClient.notify();
+    if (checkOutWithEventId.checkOutSelfie) {
+      uploadSelfieWithRetry(recordId, checkOutWithEventId.checkOutSelfie, 'CHECK_OUT').catch((err) => {
+        console.warn('[AttendanceService] Check-out selfie upload failed after retries, queued:', err?.message || err);
+      });
+    }
+    return { queued: false as const };
+  },
+
+  hasPendingCheckOut(employeeId: string, date: string): boolean {
+    return checkInSyncQueue.list().some((entry) =>
+      entry.kind === 'CHECK_OUT'
+      && entry.status !== 'DEAD_LETTER'
+      && entry.payload.employeeId === employeeId
+      && entry.payload.date === date,
+    );
+  },
+
   async saveManualAttendance(data: Attendance): Promise<void> {
     if (!isSupabaseConfigured()) return;
     const orgId = apiClient.getOrganizationId();
@@ -413,7 +491,9 @@ export const attendanceService = {
 
       try {
         let createdId: string;
-        if (entry.payload.clientEventId && entry.payload.location?.capturedAt && entry.payload.location.accuracyM != null) {
+        if (entry.kind === 'CHECK_OUT') {
+          createdId = await submitVerifiedCheckOut(entry.payload as Attendance);
+        } else if (entry.payload.clientEventId && entry.payload.location?.capturedAt && entry.payload.location.accuracyM != null) {
           createdId = await submitVerifiedCheckIn(entry.payload as Attendance);
         } else {
           // Backward compatibility for entries queued before migration 0042.
@@ -442,7 +522,11 @@ export const attendanceService = {
         checkInSyncQueue.markSuccess(entry.id);
         drained += 1;
 
-        if (entry.payload.selfie) {
+        if (entry.kind === 'CHECK_OUT' && entry.payload.checkOutSelfie) {
+          uploadSelfieWithRetry(createdId, entry.payload.checkOutSelfie, 'CHECK_OUT').catch((e) => {
+            console.warn('[AttendanceService] Queued check-out selfie upload failed:', e?.message || e);
+          });
+        } else if (entry.payload.selfie) {
           uploadSelfieWithRetry(createdId, entry.payload.selfie).catch((e) => {
             console.warn('[AttendanceService] Queued selfie upload failed:', e?.message || e);
           });
@@ -468,7 +552,7 @@ export const attendanceService = {
     const remaining: PendingSelfie[] = [];
     for (const entry of queue) {
       try {
-        await uploadSelfieOnce(entry.recordId, entry.selfieDataUrl);
+        await uploadSelfieOnce(entry.recordId, entry.selfieDataUrl, entry.evidenceType || 'CHECK_IN');
       } catch {
         if (Date.now() - entry.queuedAt < 7 * 24 * 60 * 60 * 1000) {
           remaining.push(entry);

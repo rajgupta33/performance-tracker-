@@ -507,12 +507,25 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
             
             <div className="p-8 md:p-10 space-y-8 max-h-[80vh] overflow-y-auto no-scrollbar">
               <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="w-48 h-60 rounded-xl overflow-hidden border-4 border-slate-100 shadow-xl bg-slate-50 flex-shrink-0 relative group">
-                  {selectedLog.selfie ? (
-                    <img src={selectedLog.selfie} className="w-full h-full object-cover scale-x-[-1]" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><Camera size={48} /></div>
-                  )}
+                <div className="grid grid-cols-2 gap-3 flex-shrink-0">
+                  {[
+                    { label: 'Check-in', src: selectedLog.selfie },
+                    { label: 'Check-out', src: selectedLog.checkOutSelfie },
+                  ].map((evidence) => (
+                    <div key={evidence.label} className="space-y-2">
+                      <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest text-center">{evidence.label} evidence</p>
+                      <div className="w-32 h-44 rounded-xl overflow-hidden border-4 border-slate-100 shadow-lg bg-slate-50 relative group">
+                        {evidence.src ? (
+                          <img src={evidence.src} alt={`${evidence.label} attendance evidence`} className="w-full h-full object-cover scale-x-[-1]" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col gap-2 items-center justify-center text-slate-300 bg-slate-100">
+                            <Camera size={32} />
+                            <span className="text-[8px] font-semibold uppercase tracking-wider">Not captured</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex-1 w-full space-y-6">
@@ -665,6 +678,28 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
                    <a href={`https://www.google.com/maps?q=${selectedLog.location?.lat},${selectedLog.location?.lng}`} target="_blank" rel="noreferrer" className="p-3 bg-white text-primary rounded-xl shadow-sm border border-slate-50 hover:bg-primary hover:text-white transition-all"><ExternalLink size={18} /></a>
                 </div>
               </div>
+
+              {selectedLog.checkOutLocation && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                    <MapPin size={12} className="text-rose-500" /> GPS Validation (Check-out)
+                  </label>
+                  <div className="p-5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                    <div className="flex-1 pr-4">
+                      <p className="text-xs font-bold text-slate-700">{selectedLog.checkOutLocation.address || 'Address unavailable'}</p>
+                      <p className="text-[9px] font-mono text-slate-400 mt-1">{selectedLog.checkOutLocation.lat.toFixed(6)}, {selectedLog.checkOutLocation.lng.toFixed(6)}</p>
+                      <p className="text-[9px] font-semibold mt-1 text-emerald-600">
+                        Accuracy ±{Math.round(selectedLog.checkOutLocation.accuracyM || 0)} m
+                        {selectedLog.checkOutLocation.capturedAt ? ` · Captured ${new Date(selectedLog.checkOutLocation.capturedAt).toLocaleString()}` : ''}
+                      </p>
+                      {selectedLog.checkOutRemarks && (
+                        <p className="text-[10px] text-slate-500 mt-2">Check-out note: {selectedLog.checkOutRemarks}</p>
+                      )}
+                    </div>
+                    <a href={`https://www.google.com/maps?q=${selectedLog.checkOutLocation.lat},${selectedLog.checkOutLocation.lng}`} target="_blank" rel="noreferrer" className="p-3 bg-white text-primary rounded-xl shadow-sm border border-slate-50 hover:bg-primary hover:text-white transition-all"><ExternalLink size={18} /></a>
+                  </div>
+                </div>
+              )}
 
               {isAdmin && (
                 <div className="space-y-1.5">

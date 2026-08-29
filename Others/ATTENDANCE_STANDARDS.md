@@ -1,6 +1,6 @@
 # Attendance & Workday Standards — Industry Reference + OpenHR Gap Analysis
 
-**Status:** Reference document. Last reviewed 2026-08-27.
+**Status:** Reference document. Last reviewed 2026-08-30.
 **Audience:** OpenHR product owner and any future contributor (human or AI)
 making decisions about workday, session, and check-in/check-out behavior.
 **Why this exists:** The "forgotten check-out leaves the session active
@@ -24,7 +24,7 @@ patterns, with an honest gap analysis.
 This is **not** legal advice. It is a product reference rooted in publicly
 documented vendor behavior and US Department of Labor (FLSA) guidance.
 
-## Implementation update (2026-08-27)
+## Implementation update (2026-08-30)
 
 The Supabase implementation now includes:
 
@@ -42,9 +42,18 @@ The Supabase implementation now includes:
   organization's configurable attendance threshold (250 metres by default).
 - Organization-timezone validation of the submitted work date and a five-minute
   freshness window for the GPS fix.
+- Verified employee check-out through a tenant-scoped, idempotent database
+  function. Check-out GPS, accuracy, capture time, selfie path, and remarks are
+  stored separately from the original check-in evidence.
+- Offline check-outs retain the same event key through retries and visibly block
+  another punch until synchronization succeeds. A lost response therefore
+  returns the already-closed session instead of rewriting or duplicating it.
+- Ordinary employee updates to attendance rows are rejected. The guard keeps
+  only the existing past-day client auto-close and asynchronous check-in selfie
+  link as narrow compatibility paths.
 
 These changes are defined by migrations `0041_attendance_audit_reviews.sql`
-and `0042_attendance_verified_checkin.sql`.
+through `0043_attendance_verified_checkout.sql`.
 They do not feed attendance into performance scoring. The employee-initiated
 missed-punch request form and payroll lock remain future work.
 

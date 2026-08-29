@@ -24,6 +24,9 @@ export const changelog: ChangelogRelease[] = [
       { type: 'fix', description: 'Attendance now derives the work date and late-check wall clock from the organization timezone while storing the exact captured instant. This prevents punches around UTC midnight from being assigned to the previous or next workday.' },
       { type: 'fix', description: 'The punch action stays disabled when the current attendance session cannot be synchronized, with a visible retry action. If a punch was saved but the follow-up refresh fails, the app now says it was saved instead of reporting a false failure that could prompt a duplicate punch.' },
       { type: 'improvement', description: 'Employees opening the main attendance screen can choose Office or Field / Factory before checking in; an active session keeps its original duty type.' },
+      { type: 'security', description: 'Employee check-outs now use a tenant-scoped database function that verifies session ownership, GPS accuracy and freshness, and that the captured check-out follows the check-in. Ordinary employee edits to attendance evidence are rejected.' },
+      { type: 'fix', description: 'Offline check-outs now retain a stable event ID and remain visibly pending until synchronization. Retrying after a lost response returns the original closed session without overwriting its evidence.' },
+      { type: 'improvement', description: 'Check-out GPS, capture time, selfie, and notes are stored separately from check-in evidence and displayed independently in the attendance audit view.' },
     ],
   },
   {

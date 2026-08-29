@@ -15,6 +15,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasPendingCheckIn, setHasPendingCheckIn] = useState(false);
+  const [hasPendingCheckOut, setHasPendingCheckOut] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'queued'>('idle');
 
   // Clock Timer
@@ -46,6 +47,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
       const { active, closedPast } = reconciled;
       const today = getAttendanceClock(new Date(), config.timezone || 'UTC').date;
       setHasPendingCheckIn(hrService.hasPendingCheckIn(user.id, today));
+      setHasPendingCheckOut(hrService.hasPendingCheckOut(user.id, today));
 
       if (active && active.date !== today) {
         setActiveRecord(undefined);
@@ -103,7 +105,23 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
 
       if (activeRecord && !activeRecord.checkOut) {
         // Clock Out
-        await hrService.updateAttendance(activeRecord.id, { checkOut: clock.capturedAt, remarks });
+        const result = await hrService.saveCheckOut({
+          ...activeRecord,
+          targetAttendanceId: activeRecord.id,
+          checkOut: clock.capturedAt,
+          checkOutLocation: location,
+          checkOutSelfie: selfieData,
+          checkOutRemarks: remarks,
+        });
+        if (result?.queued) {
+          setHasPendingCheckOut(true);
+          setStatus('queued');
+          showToast('Check-out saved offline. It will sync automatically; do not punch again.', 'info');
+          setTimeout(() => {
+            if (onFinish) onFinish();
+          }, 1800);
+          return;
+        }
       } else {
         // Clock In
         let punchStatus: Attendance['status'] = 'PRESENT';
@@ -177,6 +195,7 @@ export const useAttendance = (user: any, onFinish?: () => void) => {
     isRefreshing,
     loadError,
     hasPendingCheckIn,
+    hasPendingCheckOut,
     status,
     submitPunch,
     retryLoad: refreshData,
