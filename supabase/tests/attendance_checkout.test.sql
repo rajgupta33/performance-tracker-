@@ -87,6 +87,15 @@ select is(
   'a replay cannot overwrite the original evidence'
 );
 
+-- submit_attendance_check_out() sets app.attendance_verified_checkout with
+-- is_local => true, i.e. scoped to the current TRANSACTION. Under PostgREST each
+-- request is its own transaction, so the flag never survives into a later direct
+-- UPDATE. pgTAP, however, runs every assertion inside one transaction, so the
+-- flag set by the check-out calls above leaks into this assertion and silently
+-- disarms the guard -- making this security test pass vacuously. Clear it first
+-- so we are actually exercising the guard.
+select set_config('app.attendance_verified_checkout', '', true);
+
 select throws_ok(
   $$update public.attendance
     set check_out_remarks = 'Employee edited audit evidence'
