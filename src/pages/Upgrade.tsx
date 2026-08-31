@@ -6,6 +6,7 @@ import {
 import { upgradeService } from '../services/upgrade.service';
 import { useSubscription } from '../context/SubscriptionContext';
 import { DonationTier, UpgradeRequest } from '../types';
+import { APP_NAME } from '../constants';
 
 interface UpgradeProps {
   onBack: () => void;
@@ -145,7 +146,7 @@ const Upgrade: React.FC<UpgradeProps> = ({ onBack }) => {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Upgrade Your Plan</h1>
-          <p className="text-slate-500">Choose how you'd like to continue using OpenHRApp</p>
+          <p className="text-slate-500">Choose how you'd like to continue using {APP_NAME}</p>
         </div>
       </div>
 
@@ -184,7 +185,7 @@ const Upgrade: React.FC<UpgradeProps> = ({ onBack }) => {
           <h2 className="text-xl font-bold">Support Open Source HR</h2>
         </div>
         <p className="text-white/90">
-          OpenHRApp is free and open source. Your support helps us maintain and improve the platform for everyone.
+          {APP_NAME} is free and open source. Your support helps us maintain and improve the platform for everyone.
         </p>
       </div>
 

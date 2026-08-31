@@ -103,7 +103,7 @@ const RegisterOrganization: React.FC<Props> = ({ onBack }) => {
                 stays ad-free by donating (ACTIVE). "Start your 14-day free
                 trial" implied the product started costing money on day 15 and
                 contradicted the site's own FAQ, which states there is no trial
-                period because OpenHRApp is permanently free. */}
+                period because the product is permanently free. */}
             <p className="text-slate-400 font-medium mt-1">Free forever — your first 14 days are ad-free</p>
           </div>
         </div>

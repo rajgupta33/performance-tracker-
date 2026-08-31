@@ -1,7 +1,7 @@
 /**
  * Hash-based deep linking utility for authenticated routes.
  *
- * OpenHRApp uses React state-based routing (currentPath in App.tsx) with no URL
+ * This app uses React state-based routing (currentPath in App.tsx) with no URL
  * representation for authenticated pages. This module adds hash-based routing
  * so that authenticated pages are shareable, bookmarkable, and support browser
  * back/forward — without a full React Router migration.
