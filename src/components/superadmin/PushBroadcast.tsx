@@ -3,6 +3,7 @@ import { Send, Users, Globe, Building2, UserCheck, User as UserIcon, Bell, Refre
 import { pushBroadcastService, type BroadcastTargetType, type BroadcastHistoryRow } from '../../services/pushBroadcast.service';
 import { superAdminService } from '../../services/superadmin.service';
 import { Organization } from '../../types';
+import { APP_NAME } from '../../constants';
 
 interface PushBroadcastProps {
   onMessage: (msg: { type: 'success' | 'error'; text: string } | null) => void;
@@ -273,7 +274,7 @@ const PushBroadcast: React.FC<PushBroadcastProps> = ({ onMessage }) => {
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-slate-900 truncate">{title || 'Title here'}</p>
                 <p className="text-sm text-slate-600 line-clamp-2">{body || 'Body text here'}</p>
-                <p className="text-xs text-slate-400 mt-1">OpenHRApp · now</p>
+                <p className="text-xs text-slate-400 mt-1">{APP_NAME} · now</p>
               </div>
             </div>
           </div>
