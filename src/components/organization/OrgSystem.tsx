@@ -9,6 +9,7 @@ import { supabase } from '../../services/supabase';
 import { convertFileToWebP } from '../../utils/imageConvert';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { AttendancePayrollLock } from './AttendancePayrollLock';
 
 interface Props {
   config: AppConfig;
@@ -303,6 +304,8 @@ export const OrgSystem: React.FC<Props> = ({ config, onSave }) => {
              </div>
          </div>
       </div>
+
+      <AttendancePayrollLock timezone={config.timezone} />
 
       {/* Duty Type Labels Section */}
       <div className="bg-white p-10 rounded-xl border border-slate-100 shadow-sm space-y-8 animate-in slide-in-from-bottom-8 duration-500">

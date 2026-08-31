@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, FilePenLine, ShieldCheck, X, XCircle } from 'lucide-react';
 import type { Attendance, AttendanceCorrectionRequest } from '../../types';
 import { validateAttendanceCorrection } from '../../services/attendance/correctionPayload';
+import { shiftYmd } from '../../services/attendance/payrollLock';
 import { useToast } from '../../context/ToastContext';
 
 interface AttendanceCorrectionPanelProps {
@@ -9,6 +10,7 @@ interface AttendanceCorrectionPanelProps {
   attendance: Attendance[];
   isAuditMode: boolean;
   currentWorkDate: string;
+  payrollLockedThrough?: string;
   onSubmit: (input: {
     attendanceId?: string;
     workDate: string;
@@ -17,6 +19,7 @@ interface AttendanceCorrectionPanelProps {
     reason: string;
     hasExistingAttendance: boolean;
     currentWorkDate?: string;
+    payrollLockedThrough?: string;
   }) => Promise<void>;
   onReview: (requestId: string, decision: 'APPROVED' | 'REJECTED', note: string) => Promise<void>;
 }
@@ -39,6 +42,7 @@ const AttendanceCorrectionPanel: React.FC<AttendanceCorrectionPanelProps> = ({
   attendance,
   isAuditMode,
   currentWorkDate,
+  payrollLockedThrough,
   onSubmit,
   onReview,
 }) => {
@@ -73,6 +77,7 @@ const AttendanceCorrectionPanel: React.FC<AttendanceCorrectionPanelProps> = ({
       reason: form.reason,
       hasExistingAttendance: Boolean(matchingAttendance),
       currentWorkDate,
+      payrollLockedThrough,
     };
     const error = validateAttendanceCorrection(input);
     if (error) {
@@ -171,10 +176,11 @@ const AttendanceCorrectionPanel: React.FC<AttendanceCorrectionPanelProps> = ({
             <div className="p-7 space-y-5">
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Attendance date</label>
-                <input type="date" min={earliestYmd(currentWorkDate)} max={currentWorkDate} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold" />
+                <input type="date" min={payrollLockedThrough && shiftYmd(payrollLockedThrough, 1) > earliestYmd(currentWorkDate) ? shiftYmd(payrollLockedThrough, 1) : earliestYmd(currentWorkDate)} max={currentWorkDate} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold" />
                 <p className="text-[9px] text-slate-400 mt-1">
                   {matchingAttendance ? `Recorded: ${matchingAttendance.checkIn || '--:--'}–${matchingAttendance.checkOut || 'missing'}` : 'No attendance record exists; both times are required.'}
                 </p>
+                {payrollLockedThrough && <p className="text-[9px] text-amber-600 mt-1">Payroll is finalized through {payrollLockedThrough}.</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

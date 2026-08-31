@@ -42,6 +42,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
   
   const [logs, setLogs] = useState<Attendance[]>([]);
   const [correctionRequests, setCorrectionRequests] = useState<AttendanceCorrectionRequest[]>([]);
+  const [payrollLockedThrough, setPayrollLockedThrough] = useState<string | undefined>();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -84,16 +85,18 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
         ? { since: sinceYearAgo, maxRows: 10000 }
         : { since: sinceYearAgo, employeeId: user.id, maxRows: 2000 };
 
-      const [allAttendance, fetchedEmployees, depts, appConfig, fetchedCorrections] = await Promise.all([
+      const [allAttendance, fetchedEmployees, depts, appConfig, fetchedCorrections, payrollLock] = await Promise.all([
         hrService.getAttendance(attendanceScope),
         hrService.getEmployees(),
         hrService.getDepartments(),
         hrService.getConfig(),
         hrService.getAttendanceCorrectionRequests(),
+        hrService.getAttendancePayrollLock(),
       ]);
 
       setConfig(appConfig);
       setCorrectionRequests(fetchedCorrections);
+      setPayrollLockedThrough(payrollLock?.lockedThrough);
 
       if (isAuditMode) {
         if (isAdmin) {
@@ -442,6 +445,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ user, viewMode = 'MY', 
         attendance={logs}
         isAuditMode={isAuditMode}
         currentWorkDate={getAttendanceClock(new Date(), config?.timezone || 'UTC').date}
+        payrollLockedThrough={payrollLockedThrough}
         onSubmit={handleCorrectionSubmit}
         onReview={handleCorrectionReview}
       />

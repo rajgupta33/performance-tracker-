@@ -58,11 +58,18 @@ The Supabase implementation now includes:
 - Approved requests apply through a server function, notify the employee, and
   write the corrected attendance through the immutable change-history trigger.
   Submission notifies the line manager/team leader and HR administrators.
+- HR and administrators can advance an irreversible payroll lock-through date
+  for completed attendance. Locked dates reject inserts, edits, deletes,
+  auto-close mutations, new correction requests, and correction approvals.
+- Every payroll lock advancement records its previous boundary, new boundary,
+  actor, note, and timestamp. Organization-level transaction locking prevents
+  finalization racing a concurrent attendance mutation. Finalization also
+  refuses to strand an open session or pending correction request.
 
 These changes are defined by migrations `0041_attendance_audit_reviews.sql`
-through `0044_attendance_correction_requests.sql`.
+through `0045_attendance_payroll_lock.sql`.
 They do not feed attendance into performance scoring. Payroll-period locking
-remains future work.
+is independent of performance scoring.
 
 ---
 
@@ -345,10 +352,7 @@ Ordered by user-visible impact.
 3. **No max-hours auto-stop.** A session opened at 23:00 and forgotten
    will be closed at the next configured `autoSessionCloseTime` of the
    following day, which can result in 20+ hour fabricated sessions.
-4. **No payroll lock/finalization window.** Corrections are limited to
-   90 days, but an approved historical request can still modify a period
-   after payroll has exported it because no locked-through date exists.
-5. **Server cron is a single point of failure.** The client fallback
+4. **Server cron is a single point of failure.** The client fallback
    we added (`workdaySessionManager`) mitigates this for active
    employees but does nothing for employees on extended leave (their
    open session sits forever until they log in).
@@ -362,8 +366,6 @@ Ordered by user-visible impact.
 - **Pre-close reminder.** New cron entry that fires 30 minutes before
   each shift's `auto_session_close_time` and pushes a bell + email to
   any employee with an open session. No new schema needed.
-- **Payroll lock.** Add a per-organization locked-through date and reject
-  employee requests or approvals that would rewrite a finalized period.
 
 ### Next (one or two iterations out)
 
@@ -396,6 +398,7 @@ section of this document**:
 | Remark format for system closures | §7.3 and §9 (Now bullet "Distinguish remarks") |
 | `shifts` schema or `app_config.autoSessionCloseTime` semantics | §7.1 (configurable knobs) and §8 (max-hours gap) |
 | Add a manager review queue or correction workflow | §7.3, §8, and §9 — move the relevant items out of "Missing" |
+| Change payroll-finalization semantics | Implementation update, §7.3, §8, and §9 |
 
 This keeps the gap analysis honest as the product evolves.
 

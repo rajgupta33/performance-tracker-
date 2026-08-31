@@ -54,4 +54,15 @@ describe('attendance correction payload', () => {
       currentWorkDate: '2026-08-31',
     }, today)).toBe('');
   });
+
+  it('rejects requests inside a finalized payroll period', () => {
+    expect(validateAttendanceCorrection({
+      workDate: '2026-08-28',
+      proposedCheckOut: '18:00',
+      reason: 'Forgot to record checkout before payroll finalization.',
+      hasExistingAttendance: true,
+      currentWorkDate: '2026-08-30',
+      payrollLockedThrough: '2026-08-28',
+    }, today)).toContain('finalized through 2026-08-28');
+  });
 });

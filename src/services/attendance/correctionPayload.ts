@@ -6,6 +6,7 @@ export interface AttendanceCorrectionInput {
   reason: string;
   hasExistingAttendance: boolean;
   currentWorkDate?: string;
+  payrollLockedThrough?: string;
 }
 
 export const validateAttendanceCorrection = (
@@ -22,6 +23,9 @@ export const validateAttendanceCorrection = (
   earliest.setDate(earliest.getDate() - 90);
   if (workDate > localToday) return 'Future attendance cannot be corrected.';
   if (workDate < earliest) return 'Attendance corrections are limited to the last 90 days.';
+  if (input.payrollLockedThrough && input.workDate <= input.payrollLockedThrough) {
+    return `Attendance is finalized through ${input.payrollLockedThrough}.`;
+  }
   if (!input.proposedCheckIn && !input.proposedCheckOut) return 'Enter at least one corrected punch time.';
   if (!input.hasExistingAttendance && (!input.proposedCheckIn || !input.proposedCheckOut)) {
     return 'A missing attendance day requires both check-in and check-out times.';

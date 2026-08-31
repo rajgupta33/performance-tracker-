@@ -1,7 +1,13 @@
 
 import { supabase, isSupabaseConfigured } from './supabase';
 import { apiClient, dedupe } from './api.client';
-import { Attendance, AttendanceChangeEvent, AttendanceCorrectionRequest } from '../types';
+import {
+  Attendance,
+  AttendanceChangeEvent,
+  AttendanceCorrectionRequest,
+  AttendancePayrollLock,
+  AttendancePayrollLockEvent,
+} from '../types';
 import { organizationService } from './organization.service';
 import { notificationService } from './notification.service';
 import { workdaySessionManager } from './workday/workdaySessionManager';
@@ -12,6 +18,7 @@ import { CheckInSyncEntry } from './attendance/syncQueue.types';
 import { buildAttendanceCheckInParams, ensureAttendanceEventId } from './attendance/checkInPayload';
 import { buildAttendanceCheckOutParams, ensureCheckOutEventId } from './attendance/checkOutPayload';
 import { AttendanceCorrectionInput, buildAttendanceCorrectionParams, validateAttendanceCorrection } from './attendance/correctionPayload';
+import { PayrollLockAdvanceInput, buildPayrollLockParams, validatePayrollLockAdvance } from './attendance/payrollLock';
 
 const SELFIE_WEBP_QUALITY = 0.65;
 const SELFIE_MAX_DIMENSION = 720;
@@ -274,6 +281,24 @@ const mapAttendanceCorrection = (r: any): AttendanceCorrectionRequest => ({
   reviewedAt: r.reviewed_at || undefined,
   created: r.created,
   organizationId: r.organization_id,
+});
+
+const mapAttendancePayrollLock = (r: any): AttendancePayrollLock => ({
+  organizationId: r.organization_id,
+  lockedThrough: r.locked_through,
+  lockedBy: r.locked_by,
+  note: r.note,
+  updated: r.updated,
+});
+
+const mapAttendancePayrollLockEvent = (r: any): AttendancePayrollLockEvent => ({
+  id: r.id,
+  organizationId: r.organization_id,
+  previousLockedThrough: r.previous_locked_through || undefined,
+  lockedThrough: r.locked_through,
+  actorId: r.actor_id,
+  note: r.note,
+  created: r.created,
 });
 
 export const attendanceService = {
@@ -665,6 +690,42 @@ export const attendanceService = {
     });
     if (error) throw error;
     attendanceService.clearCache();
+    apiClient.notify();
+  },
+
+  async getAttendancePayrollLock(): Promise<AttendancePayrollLock | null> {
+    if (!isSupabaseConfigured()) return null;
+    const orgId = apiClient.getOrganizationId();
+    if (!orgId) return null;
+    const { data, error } = await supabase
+      .from('attendance_payroll_locks')
+      .select('*')
+      .eq('organization_id', orgId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapAttendancePayrollLock(data) : null;
+  },
+
+  async getAttendancePayrollLockEvents(): Promise<AttendancePayrollLockEvent[]> {
+    if (!isSupabaseConfigured()) return [];
+    const orgId = apiClient.getOrganizationId();
+    if (!orgId) return [];
+    const { data, error } = await supabase
+      .from('attendance_payroll_lock_events')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return (data || []).map(mapAttendancePayrollLockEvent);
+  },
+
+  async advanceAttendancePayrollLock(input: PayrollLockAdvanceInput): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const validationError = validatePayrollLockAdvance(input);
+    if (validationError) throw new Error(validationError);
+    const { error } = await supabase.rpc('advance_attendance_payroll_lock', buildPayrollLockParams(input));
+    if (error) throw error;
     apiClient.notify();
   },
 

@@ -30,6 +30,9 @@ export const changelog: ChangelogRelease[] = [
       { type: 'feature', description: 'Employees can now request missed-punch corrections for an existing attendance record or a completely missing day. Requests are limited to the last 90 days, keep the original punches visible, and cannot change attendance until approved.' },
       { type: 'security', description: 'Attendance correction approval is enforced by tenant and reporting scope on the server. Managers can review only direct reports or their team, every decision requires a note, and employees cannot insert or update correction records directly.' },
       { type: 'improvement', description: 'Managers, HR, and administrators now have a correction review queue in Attendance Audit. Approval applies the proposed punches through the immutable attendance history, while submission and resolution generate in-app notifications.' },
+      { type: 'feature', description: 'HR and administrators can now finalize attendance through a completed payroll date from Organization → System. The lock boundary is irreversible and every advance records the previous date, new date, actor, note, and timestamp.' },
+      { type: 'security', description: 'Finalized payroll dates reject attendance inserts, edits, deletions, automatic closure, new correction requests, and correction approvals. Organization-level transaction locking prevents payroll finalization from racing a concurrent attendance mutation.' },
+      { type: 'improvement', description: 'The payroll lock screen shows the active finalized boundary and immutable advancement history, requires a finalization explanation, and prevents selecting today or moving the boundary backward. Finalization also pauses until open sessions and pending correction requests in the period are resolved.' },
     ],
   },
   {

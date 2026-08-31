@@ -200,6 +200,24 @@ export interface AttendanceCorrectionRequest {
   organizationId?: string;
 }
 
+export interface AttendancePayrollLock {
+  organizationId: string;
+  lockedThrough: string;
+  lockedBy: string;
+  note: string;
+  updated: string;
+}
+
+export interface AttendancePayrollLockEvent {
+  id: string;
+  organizationId: string;
+  previousLockedThrough?: string;
+  lockedThrough: string;
+  actorId: string;
+  note: string;
+  created: string;
+}
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
