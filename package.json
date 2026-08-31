@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
     "build": "vite build && node scripts/generate-sitemap.mjs && node scripts/generate-feed.mjs && node scripts/generate-llms.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "feed": "node scripts/generate-feed.mjs",
