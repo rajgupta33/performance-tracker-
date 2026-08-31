@@ -1,105 +1,81 @@
+import React from 'react';
+import { AlertCircle, Database } from 'lucide-react';
+import { APP_NAME } from '../constants';
 
-import React, { useState } from 'react';
-import { Database, Server, Activity, RefreshCw, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
-// Supabase migration (May 2026): This page is dead — isSupabaseConfigured() is always true.
-// Keep for reference; PocketBase config function no longer needed.
-import { hrService } from '../services/hrService';
+/**
+ * Rendered by App.tsx when `isConfigured` is false, i.e. when
+ * isSupabaseConfigured() reports a missing VITE_SUPABASE_URL or
+ * VITE_SUPABASE_ANON_KEY at build time.
+ *
+ * This used to be a PocketBase connection form left over from the pre-Supabase
+ * stack. It defaulted to a third-party host and its save handler called
+ * onComplete() unconditionally, which flipped `isConfigured` to true and let
+ * the user into an app with no backend at all. A misconfigured deploy is a
+ * configuration error, not something a visitor can resolve, so this screen now
+ * just reports the fault accurately and offers no way past it.
+ */
 
 interface SetupProps {
-  onComplete: () => void;
+  /** Retained for App.tsx's call signature; intentionally unused. */
+  onComplete?: () => void;
 }
 
-const Setup: React.FC<SetupProps> = ({ onComplete }) => {
-  const [url, setUrl] = useState('https://pbase.vclbd.net');
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    try {
-      // Use the helper in hrService to ping the /api/health endpoint
-      const result = await hrService.testPocketBaseConnection(url);
-      if (result.success) {
-        setTestResult({ success: true, message: 'Server is reachable and healthy!' });
-      } else {
-        setTestResult({ success: false, message: result.message || 'Connection failed. Check IP and Port.' });
-      }
-    } catch (e) {
-      setTestResult({ success: false, message: 'Invalid URL or network timeout.' });
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const handleSave = () => {
-    // Dead code: Supabase is configured via environment variables (May 2026)
-    onComplete();
-  };
+const Setup: React.FC<SetupProps> = () => {
+  // Read at render rather than module scope: the values are fixed at build time
+  // in a real deploy, but evaluating here keeps the component testable.
+  const vars = [
+    { name: 'VITE_SUPABASE_URL', present: Boolean(import.meta.env.VITE_SUPABASE_URL) },
+    { name: 'VITE_SUPABASE_ANON_KEY', present: Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY) },
+  ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 overflow-hidden relative">
-      <div className="absolute top-[-10%] left-[-10%] w-1/2 h-1/2 bg-primary-light blur-[120px] rounded-full opacity-20"></div>
-      
-      <div className="w-full max-w-xl animate-in fade-in zoom-in duration-500 relative z-10">
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-primary p-10 text-white text-center">
-            <div className="inline-flex items-center justify-center p-4 bg-white/20 rounded-3xl mb-6 shadow-xl backdrop-blur-md">
-              <Database size={40} />
-            </div>
-            <h1 className="text-3xl font-semibold tracking-tight mb-2">Backend Setup</h1>
-            <p className="text-white/80 font-medium">Link OpenHRApp to your PocketBase instance</p>
+  <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 relative overflow-hidden">
+    <div className="absolute top-[-10%] left-[-10%] w-1/2 h-1/2 bg-primary-light blur-[120px] rounded-full opacity-20" />
+
+    <div className="w-full max-w-lg relative z-10">
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-slate-900 p-10 text-white text-center">
+          <div className="inline-flex items-center justify-center p-4 bg-white/10 rounded-3xl mb-6">
+            <Database size={40} />
           </div>
-
-          <div className="p-10 space-y-8">
-            <div className="space-y-4">
-              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest px-1">PocketBase IP Address</label>
-              <div className="relative">
-                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300">
-                  <Server size={20} />
-                </div>
-                <input 
-                  type="text" 
-                  className="w-full pl-14 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:ring-4 focus:ring-primary-light transition-all"
-                  placeholder="https://pbase.vclbd.net"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 px-2 font-medium italic">Note: The system will automatically remove any trailing "/api" if included.</p>
-            </div>
-
-            {testResult && (
-              <div className={`p-6 rounded-xl flex items-start gap-4 border animate-in slide-in-from-top-4 ${
-                testResult.success ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'
-              }`}>
-                {testResult.success ? <ShieldCheck className="mt-0.5" /> : <AlertCircle className="mt-0.5" />}
-                <div className="space-y-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest">Test Result</p>
-                  <p className="text-sm font-bold">{testResult.message}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button 
-                onClick={handleTest}
-                disabled={isTesting}
-                className="flex-1 py-5 bg-slate-100 text-slate-600 rounded-xl font-semibold uppercase text-xs tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
-              >
-                {isTesting ? <RefreshCw className="animate-spin" size={18} /> : <Activity size={18} />}
-                Test Connection
-              </button>
-              <button 
-                onClick={handleSave}
-                disabled={!url || isTesting}
-                className="flex-[1.5] py-5 bg-primary text-white rounded-xl font-semibold uppercase text-xs tracking-widest shadow-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-2"
-              >
-                Save & Continue <ArrowRight size={18} />
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight mb-2">Backend not configured</h1>
+          <p className="text-white/70 text-sm">
+            {APP_NAME} cannot reach its database because required build-time
+            configuration is missing.
+          </p>
         </div>
+
+        <div className="p-8 space-y-5">
+          <ul className="space-y-2">
+            {vars.map((v) => (
+              <li
+                key={v.name}
+                className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+              >
+                <AlertCircle
+                  size={16}
+                  className={v.present ? 'text-emerald-500' : 'text-rose-500'}
+                />
+                <code className="text-xs font-semibold text-slate-700">{v.name}</code>
+                <span
+                  className={`ml-auto text-[10px] font-semibold uppercase tracking-widest ${
+                    v.present ? 'text-emerald-600' : 'text-rose-600'
+                  }`}
+                >
+                  {v.present ? 'set' : 'missing'}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            These are read at build time, so setting them requires a rebuild and
+            redeploy — not a page refresh. If you are an administrator, add them
+            to the deployment environment. If you are not, please contact your
+            administrator.
+          </p>
+        </div>
+      </div>
       </div>
     </div>
   );
