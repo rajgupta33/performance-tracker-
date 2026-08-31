@@ -1,5 +1,16 @@
 import { AppConfig, CustomCompetency, CustomLeaveType, OrgReviewConfig, OrgNotificationConfig, UserNotificationPreferences } from './types';
 
+/**
+ * Product name. Used anywhere the application identifies itself to a user or
+ * to a recipient outside the app -- PDF and CSV exports, generated report
+ * footers, outbound email. Keep this the single source of truth so the brand
+ * cannot drift back to the upstream name it was forked from.
+ */
+export const APP_NAME = 'Vardhnam FieldForce';
+
+/** Filename-safe form of APP_NAME, for generated download filenames. */
+export const APP_FILE_PREFIX = 'Vardhnam_FieldForce';
+
 export const DEPARTMENTS = [
   "Engineering",
   "Human Resources",
