@@ -10,7 +10,7 @@ create table public.attendance_payroll_locks (
 );
 
 create table public.attendance_payroll_lock_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   previous_locked_through date,
   locked_through date not null,

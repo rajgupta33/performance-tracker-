@@ -1,7 +1,7 @@
 -- Employee missed-punch correction requests with scoped manager approval.
 
 create table public.attendance_correction_requests (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   attendance_id uuid references public.attendance(id) on delete set null,
   employee_id text not null,
